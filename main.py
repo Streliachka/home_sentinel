@@ -2,37 +2,59 @@ import os
 
 # 1. Настройки окружения
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
-# LiteLLM иногда все равно ищет ключ, дадим ему любой текст
 os.environ["OPENAI_API_KEY"] = "sk-ollama-local" 
 
 from crewai import Agent, Task, Crew, Process
 from tools import scan_network_logic, get_vendor_logic
 
-# 2. Нативная модель
+# Нативная модель
 LOCAL_MODEL = "ollama/llama3.1:8b"
 
-# 3. Агент
+# Агент
 watcher = Agent(
     role='Network Security Specialist',
-    goal='Scan the subnet {subnet} and identify all devices.',
+    goal='''Scan the subnet {subnet} and identify all devices. Some IoT devices (like LG Laundry) might be in sleep mode''',
     backstory='You are a cyber-security expert guarding a home network.',
-    tools=[scan_network_logic, get_vendor_logic],
+    #tools=[scan_network_logic, get_vendor_logic],
+    tools=[scan_network_logic],
     llm=LOCAL_MODEL,
     verbose=True,
+    max_iter=2,
     allow_delegation=False
 )
 
-# 4. Задача
-scan_task = Task(
-    description='1. Scan {subnet} using nmap. 2. For each MAC, find vendor. 3. Return a table.',
-    expected_output='Markdown table with IP, MAC, and Vendor.',
+# Analyst
+analyst = Agent(
+    role='Cybersecurity Risk Analyst',
+    goal='Analyze raw network data to identify potential threats and organize information. ',
+    backstory='You are a certified security auditor. You look at open ports and device names to find vulnerabilities.',
+    llm=LOCAL_MODEL,
+    verbose=True
+)
+
+# Задача 
+task_scan = Task(
+    description='Scan the network {subnet}. Focus on finding every active IP and all their open ports.',
+    expected_output='A raw list of devices with their IPs, MACs, and open ports string.',
     agent=watcher
+)
+
+task_analyze = Task(
+    description='''Review the raw scan data. 
+    1. Identify what kind of device each one is (e.g., IoT, PC, Router).
+    2. Analyze open ports: are they dangerous? (e.g. port 23/Telnet is bad).
+    3. Create a final professional Markdown table.''',
+    expected_output='''A final security report in Markdown:
+    - Summary of the network health.
+    - Table: Device | IP | Open Ports | Risk Level | Recommendation.''',
+    agent=analyst,
+    context=[task_scan] # Явно указываем, что аналитик ждет данные от сканера
 )
 
 # 5. Команда
 sentinel_crew = Crew(
-    agents=[watcher],
-    tasks=[scan_task],
+    agents=[watcher, analyst],
+    tasks=[task_scan, task_analyze],
     process=Process.sequential
 )
 
