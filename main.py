@@ -1,40 +1,42 @@
 import os
+
+# 1. Настройки окружения
+os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
+# LiteLLM иногда все равно ищет ключ, дадим ему любой текст
+os.environ["OPENAI_API_KEY"] = "sk-ollama-local" 
+
 from crewai import Agent, Task, Crew, Process
-from langchain_community.llms import Ollama
-from tools import NetworkTools
+from tools import scan_network_logic, get_vendor_logic
 
-# 1. Setting up local model (Ollama)
-# Make sure you've done `ollama pull llama3`
-llm = Ollama(model="llama3", base_url="http://localhost:11434")
+# 2. Нативная модель
+LOCAL_MODEL = "ollama/llama3.1:8b"
 
-# 2. Creating an Agent
+# 3. Агент
 watcher = Agent(
     role='Network Security Specialist',
-    goal='Scan the network {subnet}, match MAC addresses with vendors, and identify suspicious devices.',
-    backstory='You are a domestic AI guardian. Your task is to ensure that only familiar devices (e.g., your laptop, phone, router) are in the network. If you see a new device from an unknown vendor - it\'s reason for concern.',
-    tools=[NetworkTools.scan_network, NetworkTools.get_mac_vendor],
-    llm=llm,
-    verbose=True
+    goal='Scan the subnet {subnet} and identify all devices.',
+    backstory='You are a cyber-security expert guarding a home network.',
+    tools=[scan_network_logic, get_vendor_logic],
+    llm=LOCAL_MODEL,
+    verbose=True,
+    allow_delegation=False
 )
 
-# 3. Task to perform
+# 4. Задача
 scan_task = Task(
-    description='Perform a network scan of {subnet}. For each found MAC address, find the vendor. Create a list: IP - MAC - Vendor.',
-    expected_output='Table with a list of all devices and final conclusion: is there anyone else in the network?',
+    description='1. Scan {subnet} using nmap. 2. For each MAC, find vendor. 3. Return a table.',
+    expected_output='Markdown table with IP, MAC, and Vendor.',
     agent=watcher
 )
 
-# 4. Forming a crew
+# 5. Команда
 sentinel_crew = Crew(
     agents=[watcher],
     tasks=[scan_task],
     process=Process.sequential
 )
 
-# 5. Let's go!
 if __name__ == "__main__":
-    print("--- Starting Domestic Guardian ---")
-    result = sentinel_crew.kickoff(inputs={'subnet': '192.168.0.0/24'})
-    print("\n\n########################")
-    print("## GUARDIAN REPORT: ")
-    print(result)
+    print("\n--- [AGENT IS WAKING UP] ---")
+    # Убедись, что Ollama запущена в фоне!
+    sentinel_crew.kickoff(inputs={'subnet': '192.168.0.0/24'})
