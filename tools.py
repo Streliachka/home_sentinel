@@ -11,7 +11,7 @@ def scan_network_logic(ip_range: str):
     try:
         nmap_path = r"C:\Program Files (x86)\Nmap\nmap.exe" 
         #result = subprocess.check_output([nmap_path, "-sn", ip_range], text=True)
-        result = subprocess.check_output([nmap_path, "-PR", "-sn", ip_range], text=True)
+        result = subprocess.check_output([nmap_path, "-sn", ip_range], text=True)
         return result
     except Exception as e:
         return f"Nmap error: {str(e)}"
