@@ -5,7 +5,7 @@ os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
 os.environ["OPENAI_API_KEY"] = "sk-ollama-local" 
 
 from crewai import Agent, Task, Crew, Process
-from tools import scan_network_logic, get_vendor_logic
+from tools import scan_network_logic, get_vendor_logic, flexible_nmap
 
 # Нативная модель
 LOCAL_MODEL = "ollama/llama3.1:8b"
@@ -13,13 +13,13 @@ LOCAL_MODEL = "ollama/llama3.1:8b"
 # Агент
 watcher = Agent(
     role='Network Security Specialist',
-    goal='''Scan the subnet {subnet} and identify all devices. Some IoT devices (like LG Laundry) might be in sleep mode''',
+    goal='''Scan the subnet {subnet} and identify all devices. Some IoT devices might be in sleep mode. ''',
     backstory='You are a cyber-security expert guarding a home network.',
     #tools=[scan_network_logic, get_vendor_logic],
-    tools=[scan_network_logic],
+    tools=[scan_network_logic, flexible_nmap],
     llm=LOCAL_MODEL,
     verbose=True,
-    max_iter=2,
+    max_iter=3,
     allow_delegation=False
 )
 
@@ -34,7 +34,7 @@ analyst = Agent(
 
 # Задача 
 task_scan = Task(
-    description='Scan the network {subnet}. Focus on finding every active IP and all their open ports.',
+    description='Scan the network {subnet}. Focus on finding every active IP and all their open ports. Your ultimate goal is to find all active devices.',
     expected_output='A raw list of devices with their IPs, MACs, and open ports string.',
     agent=watcher
 )
