@@ -7,8 +7,10 @@ os.environ["OPENAI_API_KEY"] = "sk-ollama-local"
 from crewai import Agent, Task, Crew, Process
 from tools import scan_network_logic, get_vendor_logic, flexible_nmap
 
-# Нативная модель
+# Если переменная не задана, используем стандартный localhost
+OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 LOCAL_MODEL = "ollama/llama3.1:8b"
+os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
 # Агент
 watcher = Agent(
@@ -19,7 +21,7 @@ watcher = Agent(
     tools=[scan_network_logic, flexible_nmap],
     llm=LOCAL_MODEL,
     verbose=True,
-    max_iter=3,
+    max_iter=5,
     allow_delegation=False
 )
 

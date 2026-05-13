@@ -1,3 +1,2 @@
-crewai==0.28.8
-langchain_community
-python-dotenv
+crewai
+langchain_openai

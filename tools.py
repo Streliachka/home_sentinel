@@ -6,7 +6,8 @@ import requests
 from crewai.tools import tool
 from typing import List
 
-nmap_path = r"C:\Program Files (x86)\Nmap\nmap.exe"
+#nmap_path = r"C:\Program Files (x86)\Nmap\nmap.exe"
+nmap_path = "nmap"
 
 @tool("scan_local_network")
 def scan_network_logic(ip_range: str):
