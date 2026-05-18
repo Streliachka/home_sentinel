@@ -1,66 +1,54 @@
+# This script simulates a security task force that includes two agents: a Network Security Specialist and a Cybersecurity Risk Analyst.
+# The goal of this exercise is to demonstrate how these agents can work together to analyze network data and identify potential threats.
+
+# Import necessary libraries and modules
 import os
 
-# 1. Настройки окружения
+# Set environment variables for telemetry and API key settings
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
 os.environ["OPENAI_API_KEY"] = "sk-ollama-local" 
 
-from crewai import Agent, Task, Crew, Process
+# Import the required classes from the crewai library
+from crewai import Crew, Process, Task
+from agents import watcher, analyst, suggestor
+from tasks import scan, analyze, suggest
+
+# Import necessary tools for network scanning and analysis
 from tools import scan_network_logic, get_vendor_logic, flexible_nmap
 
-# Если переменная не задана, используем стандартный localhost
+# Set default Ollama host URL to localhost if not set in environment variables
 OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 LOCAL_MODEL = "ollama/llama3.1:8b"
 os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
-# Агент
-watcher = Agent(
-    role='Network Security Specialist',
-    goal='''Scan the subnet {subnet} and identify all devices. Some IoT devices might be in sleep mode. ''',
-    backstory='You are a cyber-security expert guarding a home network.',
-    #tools=[scan_network_logic, get_vendor_logic],
-    tools=[scan_network_logic, flexible_nmap],
-    llm=LOCAL_MODEL,
-    verbose=True,
-    max_iter=5,
-    allow_delegation=False
-)
+# Define the Network Security Specialist agent
+watcherAgent = watcher
 
-# Analyst
-analyst = Agent(
-    role='Cybersecurity Risk Analyst',
-    goal='Analyze raw network data to identify potential threats and organize information. ',
-    backstory='You are a certified security auditor. You look at open ports and device names to find vulnerabilities.',
-    llm=LOCAL_MODEL,
-    verbose=True
-)
+# Define the Cybersecurity Risk Analyst agent
+analystAgent = analyst
+suggestAgent = suggestor
 
-# Задача 
-task_scan = Task(
-    description='Scan the network {subnet}. Focus on finding every active IP and all their open ports. Your ultimate goal is to find all active devices.',
-    expected_output='A raw list of devices with their IPs, MACs, and open ports string.',
-    agent=watcher
-)
+# Define the scan task for the Network Security Specialist agent
+scan.agent = watcherAgent
+task_scan_updated = scan
 
-task_analyze = Task(
-    description='''Review the raw scan data. 
-    1. Identify what kind of device each one is (e.g., IoT, PC, Router).
-    2. Analyze open ports: are they dangerous? (e.g. port 23/Telnet is bad).
-    3. Create a final professional Markdown table.''',
-    expected_output='''A final security report in Markdown:
-    - Summary of the network health.
-    - Table: Device | IP | Open Ports | Risk Level | Recommendation.''',
-    agent=analyst,
-    context=[task_scan] # Явно указываем, что аналитик ждет данные от сканера
-)
+# Define the analyze task for the Cybersecurity Risk Analyst agent
+task_analyze_updated = suggest
+analyze.agent = analystAgent
+analyze.context = [task_scan_updated] # The analyst depends on the data from the scanner
 
-# 5. Команда
+task_suggest_updated = suggest
+task_suggest_updated.agent = suggestAgent
+task_suggest_updated.context = [task_analyze_updated]
+
+# Define the crew that includes both agents and tasks
 sentinel_crew = Crew(
-    agents=[watcher, analyst],
-    tasks=[task_scan, task_analyze],
+    agents=[watcherAgent, analystAgent, suggestAgent],
+    tasks=[task_scan_updated, task_analyze_updated, task_suggest_updated],
     process=Process.sequential
 )
 
 if __name__ == "__main__":
     print("\n--- [AGENT IS WAKING UP] ---")
-    # Убедись, что Ollama запущена в фоне!
+    # Ensure Ollama is running in the background!
     sentinel_crew.kickoff(inputs={'subnet': '192.168.0.0/24'})
