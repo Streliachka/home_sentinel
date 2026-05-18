@@ -21,3 +21,19 @@ analyze = Task(
         - Summary of the network health.
         - Table: Device | IP | Open Ports | Risk Level | Recommendation.''',
 )
+
+task_analyze_image = Task(
+    description="Analyze the image at {image_path}. Identify the main subject, secondary objects, shot angle, and environment.",
+    expected_output="Description and a bullet-point list of literal visual facts present in the image.",
+)
+
+task_gen_description = Task(
+    description="Take visual facts and generate a commercial title (7-15 words) and 40 relevant keywords. Focus on business value and buyer intent.",
+    expected_output="An initial metadata structure with a title and keywords.",
+)
+
+task_audit_description = Task(
+    description="Audit the title and keywords. Remove all brand names/trademarks. Ensure that if 'Prague' is in the text, tags like 'Czech Republic, Europe' are added. Clean up all formatting.",
+    expected_output="The final audited stock metadata package.",
+    #output_json=FinalStockMetadata,   #!!! МАГИЯ ТУТ: CrewAI сам отформатирует вывод Агента 3 по нашей Pydantic схеме
+)

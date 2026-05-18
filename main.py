@@ -9,46 +9,70 @@ os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
 os.environ["OPENAI_API_KEY"] = "sk-ollama-local" 
 
 # Import the required classes from the crewai library
-from crewai import Crew, Process, Task
-from agents import watcher, analyst, suggestor
-from tasks import scan, analyze, suggest
-
-# Import necessary tools for network scanning and analysis
-from tools import scan_network_logic, get_vendor_logic, flexible_nmap
+from crewai import Crew, Process, Task, LLM
+from agents import visual_analyst, seo_strategist, legal_auditor
+from tasks import task_analyze_image,task_gen_description, task_audit_description
+from pydantic import BaseModel, Field
 
 # Set default Ollama host URL to localhost if not set in environment variables
 OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 LOCAL_MODEL = "ollama/llama3.1:8b"
+VISION_MODEL = "ollama/llava:7b"
+#VISION_MODEL = "ollama/moondream:latest"
+
 os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
-# Define the Network Security Specialist agent
-watcherAgent = watcher
+class FinalStockMetadata(BaseModel):
+    status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
+    modifications_made: str = Field(description="What trademarks or spam words were removed or altered")
+    title: str = Field(description="Legally safe, commercially optimized English title (7-15 words)")
+    keywords: list[str] = Field(description="Array of 35-45 clean, relevant, lowercase keywords")
 
-# Define the Cybersecurity Risk Analyst agent
-analystAgent = analyst
-suggestAgent = suggestor
-
-# Define the scan task for the Network Security Specialist agent
-scan.agent = watcherAgent
-task_scan_updated = scan
-
-# Define the analyze task for the Cybersecurity Risk Analyst agent
-task_analyze_updated = suggest
-analyze.agent = analystAgent
-analyze.context = [task_scan_updated] # The analyst depends on the data from the scanner
-
-task_suggest_updated = suggest
-task_suggest_updated.agent = suggestAgent
-task_suggest_updated.context = [task_analyze_updated]
-
-# Define the crew that includes both agents and tasks
-sentinel_crew = Crew(
-    agents=[watcherAgent, analystAgent, suggestAgent],
-    tasks=[task_scan_updated, task_analyze_updated, task_suggest_updated],
-    process=Process.sequential
+LOCAL_MODEL_OBJ = LLM(
+    model=LOCAL_MODEL, 
+    base_url=OLLAMA_HOST
 )
 
+VISION_MODEL_OBJ = LLM(
+    model=VISION_MODEL, 
+    base_url=OLLAMA_HOST
+)
+
+# Agents
+visual_analyst_agent = visual_analyst
+visual_analyst_agent.llm = VISION_MODEL_OBJ
+
+seo_strategist_agent = seo_strategist
+seo_strategist_agent.llm = LOCAL_MODEL_OBJ
+
+legal_auditor_agent = legal_auditor
+legal_auditor_agent.llm = LOCAL_MODEL_OBJ
+
+# Tasks
+taskAnalyzeImage = task_analyze_image
+taskAnalyzeImage.agent = visual_analyst_agent
+
+taskGenDescription = task_gen_description
+taskGenDescription.agent = seo_strategist_agent
+taskGenDescription.context = [taskAnalyzeImage]
+
+taskAuditDescription = task_audit_description
+taskAuditDescription.agent = legal_auditor_agent
+taskAuditDescription.context = [taskGenDescription]
+taskAuditDescription.output_json = FinalStockMetadata
+
+shutter_crew = Crew(
+    agents=[visual_analyst_agent, seo_strategist_agent, legal_auditor_agent],
+    tasks=[taskAnalyzeImage, taskGenDescription, taskAuditDescription],
+    process=Process.sequential,
+    verbose=True
+    )
+    
 if __name__ == "__main__":
-    print("\n--- [AGENT IS WAKING UP] ---")
-    # Ensure Ollama is running in the background!
-    sentinel_crew.kickoff(inputs={'subnet': '192.168.0.0/24'})
+    test_inputs = {"image_path": r"D:\Photo\ByName\ShutterStock\ToPost\20260111_Horsley-3.jpg"}
+
+    print("Starting local Microstock CrewAI Factory...")
+    result = shutter_crew.kickoff(inputs=test_inputs)
+
+    print("\nFINAL LEGALLY SAFE METADATA RESULT:")
+    print(result)
