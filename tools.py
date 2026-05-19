@@ -142,3 +142,51 @@ def flexible_nmap(subnet: str, options: str = "-F"):
         return "Error: Scan timed out."
     except Exception as e:
         return f"Execution error: {str(e)}"
+    
+
+@tool("Image Analyzer Tool")
+def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: str) -> str:
+    """Useful to analyze, describe and see the image file located at image_path."""
+    import base64
+    
+    try:
+        with open(image_path, "rb") as f:
+            img_str = base64.b64encode(f.read()).decode('utf-8')
+
+        # Warm up the model first: this triggers Ollama to load it into memory.
+        warmup_payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": "ping",
+            "stream": False,
+            "options": {"num_predict": 1},
+            "keep_alive": "10m"
+        }
+        warmup_response = requests.post(
+            f"{OLLAMA_HOST}/api/generate",
+            json=warmup_payload,
+            timeout=60
+        )
+        if warmup_response.status_code != 200:
+            return f"Error loading model in Ollama: {warmup_response.text}"
+            
+        # Напрямую обращаемся к вашему локальному Ollama API
+        payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?",
+            "stream": False,
+            "images": [img_str]
+        }
+        
+        # OLLAMA_HOST берется из ваших переменных
+        response = requests.post(
+            f"{OLLAMA_HOST}/api/generate",
+            json=payload,
+            timeout=180
+        )
+        if response.status_code == 200:
+            return response.json().get("response", "No response from model.")
+        return f"Error from Ollama: {response.text}"
+    except requests.exceptions.RequestException as e:
+        return f"Ollama API request failed: {str(e)}"
+    except Exception as e:
+        return f"Failed to process image: {str(e)}"

@@ -3,7 +3,9 @@
 
 # Import necessary libraries and modules
 import os
-import base64
+
+
+from tools import analyze_image_via_ollama
 
 # Set environment variables for telemetry and API key settings
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
@@ -17,9 +19,9 @@ from pydantic import BaseModel, Field
 
 # Set default Ollama host URL to localhost if not set in environment variables
 OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-LOCAL_MODEL = "ollama/llama3.1:8b"
-VISION_MODEL = "ollama/llava:7b"
-#VISION_MODEL = "ollama/moondream:latest"
+LOCAL_MODEL = "ollama/llama3.2:3b"
+#VISION_MODEL = "ollama/llava:7b"
+VISION_MODEL = "ollama/moondream:latest"
 
 os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
@@ -39,13 +41,10 @@ VISION_MODEL_OBJ = LLM(
     base_url=OLLAMA_HOST
 )
 
-def encode_image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
 # Agents
 visual_analyst_agent = visual_analyst
-visual_analyst_agent.llm = VISION_MODEL_OBJ
+visual_analyst_agent.llm = LOCAL_MODEL_OBJ
+visual_analyst_agent.tools = [analyze_image_via_ollama]
 
 seo_strategist_agent = seo_strategist
 seo_strategist_agent.llm = LOCAL_MODEL_OBJ
@@ -74,11 +73,11 @@ shutter_crew = Crew(
     )
     
 if __name__ == "__main__":
-    image_path = r"D:\Photo\ByName\ShutterStock\ToPost\tmp-3.jpg"
-    image_base64 = encode_image_to_base64(image_path)
+    image_path = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\hnt\28.jpg"
     test_inputs = {
             "image_path": image_path,
-            "image_base64": image_base64
+            "OLLAMA_HOST": OLLAMA_HOST,
+            "OLLAMA_MODEL": VISION_MODEL,
         }
 
     print("Starting local Microstock CrewAI Factory...")
