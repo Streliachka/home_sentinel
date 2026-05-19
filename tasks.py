@@ -28,12 +28,21 @@ task_analyze_image = Task(
 )
 
 task_gen_description = Task(
-    description="Take visual facts and generate a commercial title (7-15 words) and 40 relevant keywords. Focus on business value and buyer intent.",
+    description="""Take the visual data from Task 1 and create microstock metadata. Targeted microstock is Shutterstock.
+    
+    CRITICAL KEYWORD RULES:
+    1. Every keyword must be a SINGLE WORD (e.g., 'cyberpunk', 'boots', 'sunset') or a maximum of a 2-WORD PHRASE.
+    2. Absolutely FORBIDDEN to use long descriptions, sentences, or phrases with the word 'and' inside the keywords array.
+    3. Do NOT invent objects if they are not in the visual description.
+    
+    CRITICAL TITLE RULE:
+    Write a clean, human-readable description. Do NOT use '+' signs or technical formulas.
+    """,
     expected_output="An initial metadata structure with a title and keywords.",
 )
 
 task_audit_description = Task(
-    description="Audit the title and keywords. Remove all brand names/trademarks. Ensure that if 'Prague' is in the text, tags like 'Czech Republic, Europe' are added. Clean up all formatting.",
+    description="Audit the title and keywords. Remove all brand names/trademarks. Clean up all formatting.",
     expected_output="The final audited stock metadata package.",
     #output_json=FinalStockMetadata,   #!!! МАГИЯ ТУТ: CrewAI сам отформатирует вывод Агента 3 по нашей Pydantic схеме
 )

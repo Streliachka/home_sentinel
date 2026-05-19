@@ -25,15 +25,25 @@ VISION_MODEL = "moondream:latest"
 
 os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
+# class FinalStockMetadata(BaseModel):
+#     status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
+#     modifications_made: str = Field(description="What trademarks or spam words were removed or altered")
+#     title: str = Field(description="Legally safe, commercially optimized English title (7-15 words)")
+#     keywords: list[str] = Field(description="Array of 35-45 clean, relevant, lowercase keywords")
 class FinalStockMetadata(BaseModel):
     status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
-    modifications_made: str = Field(description="What trademarks or spam words were removed or altered")
-    title: str = Field(description="Legally safe, commercially optimized English title (7-15 words)")
-    keywords: list[str] = Field(description="Array of 35-45 clean, relevant, lowercase keywords")
+    modifications_made: str = Field(description="None or description of edits")
+    title: str = Field(
+        description="A natural, descriptive English sentence (7-15 words). NO '+' signs, NO slashes."
+    )
+    keywords: list[str] = Field(
+        description="List of 35-45 STRICTLY SINGLE WORDS or 2-word phrases max. All lowercase. Absolutely NO long sentences, NO phrases with 'and'. Example: ['cyberpunk', 'leather corset', 'prague', 'winter', 'sunset']."
+    )
 
 LOCAL_MODEL_OBJ = LLM(
     model=LOCAL_MODEL, 
-    base_url=OLLAMA_HOST
+    base_url=OLLAMA_HOST,
+    temperature=0.2
 )
 
 VISION_MODEL_OBJ = LLM(
@@ -73,7 +83,7 @@ shutter_crew = Crew(
     )
     
 if __name__ == "__main__":
-    image_path = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\hnt\28.jpg"
+    image_path = r"C:\Users\oprokopenko\Downloads\hnt\ComfyUI_temp_pmlav_00018_.png"
     test_inputs = {
             "image_path": image_path,
             "OLLAMA_HOST": OLLAMA_HOST,
