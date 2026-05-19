@@ -19,9 +19,11 @@ from pydantic import BaseModel, Field
 
 # Set default Ollama host URL to localhost if not set in environment variables
 OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-LOCAL_MODEL = "ollama/llama3.2:3b"
-#VISION_MODEL = "ollama/llava:7b"
-VISION_MODEL = "moondream:latest"
+#LOCAL_MODEL = "ollama/llama3.2:3b"
+LOCAL_MODEL = "ollama/llama3.1:8b"
+#VISION_MODEL = "llava:7b"
+#VISION_MODEL = "moondream:latest"
+VISION_MODEL = "gemma4:latest"
 
 os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
@@ -37,7 +39,7 @@ class FinalStockMetadata(BaseModel):
         description="A natural, descriptive English sentence (7-15 words). NO '+' signs, NO slashes."
     )
     keywords: list[str] = Field(
-        description="List of 35-45 STRICTLY SINGLE WORDS or 2-word phrases max. All lowercase. Absolutely NO long sentences, NO phrases with 'and'. Example: ['cyberpunk', 'leather corset', 'prague', 'winter', 'sunset']."
+        description="List of 35-45 STRICTLY SINGLE WORDS or 2-word phrases max separated by ';'. All lowercase. Absolutely NO long sentences, NO phrases with 'and'. Example: ['cyberpunk'; 'leather corset'; 'prague'; 'winter'; 'sunset']."
     )
 
 LOCAL_MODEL_OBJ = LLM(
@@ -83,7 +85,7 @@ shutter_crew = Crew(
     )
     
 if __name__ == "__main__":
-    image_path = r"C:\Users\oprokopenko\Downloads\hnt\ComfyUI_temp_pmlav_00018_.png"
+    image_path = r"D:\Photo\Edited\ByDate\2026_Edited\O_Chodov-3.jpg"
     test_inputs = {
             "image_path": image_path,
             "OLLAMA_HOST": OLLAMA_HOST,
