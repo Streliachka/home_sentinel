@@ -43,7 +43,7 @@ VISION_MODEL_OBJ = LLM(
 
 # Agents
 visual_analyst_agent = visual_analyst
-visual_analyst_agent.llm = LOCAL_MODEL_OBJ
+visual_analyst_agent.llm = VISION_MODEL_OBJ
 visual_analyst_agent.tools = [analyze_image_via_ollama]
 
 seo_strategist_agent = seo_strategist

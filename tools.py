@@ -144,18 +144,21 @@ def flexible_nmap(subnet: str, options: str = "-F"):
         return f"Execution error: {str(e)}"
     
 
-@tool("Image Analyzer Tool")
+@tool("analyze_image_via_ollama")
 def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: str) -> str:
-    """Useful to analyze, describe and see the image file located at image_path."""
+    """Analyze the image at image_path using Ollama and return a detailed literal description."""
     import base64
     
     try:
         with open(image_path, "rb") as f:
             img_str = base64.b64encode(f.read()).decode('utf-8')
 
+        # CrewAI model names often use "ollama/<name>", but Ollama HTTP API expects "<name>".
+        api_model = OLLAMA_MODEL.removeprefix("ollama/")
+
         # Warm up the model first: this triggers Ollama to load it into memory.
         warmup_payload = {
-            "model": OLLAMA_MODEL,
+            "model": api_model,
             "prompt": "ping",
             "stream": False,
             "options": {"num_predict": 1},
@@ -171,7 +174,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             
         # Напрямую обращаемся к вашему локальному Ollama API
         payload = {
-            "model": OLLAMA_MODEL,
+            "model": api_model,
             "prompt": "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?",
             "stream": False,
             "images": [img_str]
