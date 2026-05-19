@@ -153,12 +153,9 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
         with open(image_path, "rb") as f:
             img_str = base64.b64encode(f.read()).decode('utf-8')
 
-        # CrewAI model names often use "ollama/<name>", but Ollama HTTP API expects "<name>".
-        api_model = OLLAMA_MODEL.removeprefix("ollama/")
-
         # Warm up the model first: this triggers Ollama to load it into memory.
         warmup_payload = {
-            "model": api_model,
+            "model": OLLAMA_MODEL,
             "prompt": "ping",
             "stream": False,
             "options": {"num_predict": 1},
@@ -174,7 +171,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             
         # Напрямую обращаемся к вашему локальному Ollama API
         payload = {
-            "model": api_model,
+            "model": OLLAMA_MODEL,
             "prompt": "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?",
             "stream": False,
             "images": [img_str]

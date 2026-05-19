@@ -23,7 +23,7 @@ analyze = Task(
 )
 
 task_analyze_image = Task(
-    description="Analyze the image at path:{image_path}. You MUST call tool analyze_image_via_ollama exactly once with image_path, OLLAMA_HOST, and OLLAMA_MODEL. Do not output tool-call JSON in the final answer. After the tool returns, identify main subject, secondary objects, shot angle, and environment.",
+    description="Analyze the image at path:{image_path}. You MUST call tool analyze_image_via_ollama exactly once with {image_path}, {OLLAMA_HOST}, and {OLLAMA_MODEL}. Do not output tool-call JSON in the final answer. After the tool returns, identify main subject, secondary objects, shot angle, and environment.",
     expected_output="Description and a bullet-point list of literal visual facts present in the image.",
 )
 
