@@ -3,6 +3,7 @@
 
 # Import necessary libraries and modules
 import os
+import base64
 
 # Set environment variables for telemetry and API key settings
 os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
@@ -38,6 +39,10 @@ VISION_MODEL_OBJ = LLM(
     base_url=OLLAMA_HOST
 )
 
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
 # Agents
 visual_analyst_agent = visual_analyst
 visual_analyst_agent.llm = VISION_MODEL_OBJ
@@ -69,7 +74,12 @@ shutter_crew = Crew(
     )
     
 if __name__ == "__main__":
-    test_inputs = {"image_path": r"D:\Photo\ByName\ShutterStock\ToPost\20260111_Horsley-3.jpg"}
+    image_path = r"D:\Photo\ByName\ShutterStock\ToPost\tmp-3.jpg"
+    image_base64 = encode_image_to_base64(image_path)
+    test_inputs = {
+            "image_path": image_path,
+            "image_base64": image_base64
+        }
 
     print("Starting local Microstock CrewAI Factory...")
     result = shutter_crew.kickoff(inputs=test_inputs)

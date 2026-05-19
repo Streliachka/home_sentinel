@@ -35,6 +35,7 @@ visual_analyst = Agent(
     goal="Extract objective, literal visual data from image previews.",
     backstory="You are an elite, cold-eyed Quality Assurance Inspector for a global microstock agency. You have analyzed millions of commercial images. Your job is to look at an image and describe exactly what is physically present in the frame with zero artistic bias, zero poetic language, and absolute technical precision.No poetry, no art, just raw facts.",
     verbose=True,
+    llm=VISION_MODEL,
     max_iter=5,
     allow_delegation=False
 )
@@ -44,6 +45,7 @@ seo_strategist = Agent(
     goal="Transform raw visual descriptions into high-converting commercial titles and keywords.",
     backstory="You are a highly successful Microstock SEO Specialist and Digital Marketer with 10 years of experience optimizing content for Shutterstock, Adobe Stock, and Getty Images. You know exactly how corporate buyers, graphic designers, and advertisers search for visual assets to solve their business problems. You translate literal visual data into high-converting B2B keywords.",
     verbose=True,
+    llm=LOCAL_MODEL,
     max_iter=5,
     allow_delegation=False
 )

@@ -23,7 +23,7 @@ analyze = Task(
 )
 
 task_analyze_image = Task(
-    description="Analyze the image at {image_path}. Identify the main subject, secondary objects, shot angle, and environment.",
+    description="Analyze the image encoded into base64:{image_base64}. Identify the main subject, secondary objects, shot angle, and environment.",
     expected_output="Description and a bullet-point list of literal visual facts present in the image.",
 )
 
