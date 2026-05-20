@@ -169,7 +169,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
         if warmup_response.status_code != 200:
             return f"Error loading model in Ollama: {warmup_response.text}"
             
-        # Напрямую обращаемся к вашему локальному Ollama API
+        # Call your local Ollama API directly
         payload = {
             "model": OLLAMA_MODEL,
             "prompt": "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?",
@@ -177,7 +177,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             "images": [img_str]
         }
         
-        # OLLAMA_HOST берется из ваших переменных
+        # OLLAMA_HOST is taken from your environment variables
         response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
             json=payload,

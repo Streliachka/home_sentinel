@@ -59,3 +59,14 @@ legal_auditor = Agent(
     max_iter=5,
     allow_delegation=False
 )
+
+metadata_formatter = Agent(
+    role="Chief Microstock Metadata Auditor & Formatter",
+    goal="Synthesize raw visual data and chaotic SEO keywords into perfect, high-converting, policy-compliant microstock metadata.",
+    backstory="""You are a cynical, highly experienced microstock portfolio manager for Shutterstock and Adobe Stock. 
+    You know that 'Keyword Stuffing' or inventing objects that are not in the frame leads to immediate account warnings. 
+    Your superpower is taking a messy pile of descriptive words, cross-referencing it with actual image data, 
+    and outputting clean, highly commercial titles and single-word keywords that buyers actually type into the search bar.""",
+    verbose=True,
+    allow_delegation=False,
+)
