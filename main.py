@@ -5,17 +5,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 import glob
 from crewai import Crew, Process, Task, LLM
-from agents import visual_analyst, seo_strategist, legal_auditor, metadata_formatter
+from agents import visual_analyst, copyright_analyst, legal_auditor, metadata_formatter
 from tasks import task_analyze_image,task_gen_description, task_audit_description, task_format_data
 from pydantic import BaseModel, Field
 from tools import analyze_image_via_ollama
 
-# Set environment variables
-os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
-os.environ["OPENAI_API_KEY"] = "sk-ollama-local"
 load_dotenv()
 OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-os.environ["OLLAMA_BASE_URL"] = OLLAMA_HOST
 
 LOCAL_MODEL = "ollama/llama3.2:3b"
 #LOCAL_MODEL = "ollama/llama3.1:8b"
@@ -23,12 +19,12 @@ LOCAL_MODEL = "ollama/llama3.2:3b"
 VISION_MODEL = "moondream:latest"
 #VISION_MODEL = "gemma4:latest"
 
-if not os.getenv("GEMINI_API_KEY"):
-    raise ValueError("no gemini API key found.")
-
 class FinalStockMetadata(BaseModel):
     status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
     modifications_made: str = Field(description="None or description of edits")
+    visual_data: str = Field(
+        description="Original literal visual description from the visual analyst. This is the unedited, raw description of what is in the image. It should not be changed by the SEO or Legal agents, but it should be included in the final output for reference."
+    )
     title: str = Field(
         description="A natural, descriptive English sentence (7-15 words). NO '+' signs, NO slashes."
     )
@@ -36,59 +32,46 @@ class FinalStockMetadata(BaseModel):
         description="List of 35-45 STRICTLY SINGLE WORDS or 2-word phrases max separated by ';'. All lowercase. Absolutely NO long sentences, NO phrases with 'and'. Example: ['cyberpunk'; 'leather corset'; 'prague'; 'winter'; 'sunset']."
     )
 
-LOCAL_MODEL_OBJ = LLM(
-    model=LOCAL_MODEL, 
-    base_url=OLLAMA_HOST,
-    temperature=0.2
-)
-
-VISION_MODEL_OBJ = LLM(
-    model=VISION_MODEL, 
-    base_url=OLLAMA_HOST
-)
-
-GEMINI = LLM(
-    model="google/gemini-3.5-flash",
-    temperature=0.0,
-    api_key=os.getenv("GEMINI_API_KEY")
-)
 
 # Agents
 visual_analyst_agent = visual_analyst
-visual_analyst_agent.llm = LOCAL_MODEL_OBJ
 visual_analyst_agent.tools = [analyze_image_via_ollama]
 
-seo_strategist_agent = seo_strategist
-seo_strategist_agent.llm = LOCAL_MODEL_OBJ
+copyright_analyst_agent = copyright_analyst
 
 legal_auditor_agent = legal_auditor
-legal_auditor_agent.llm = LOCAL_MODEL_OBJ
-
 metadata_formatter_agent = metadata_formatter
-metadata_formatter_agent.llm = GEMINI
 
 # Tasks
 taskAnalyzeImage = task_analyze_image
 taskAnalyzeImage.agent = visual_analyst_agent
 
 taskGenDescription = task_gen_description
-taskGenDescription.agent = seo_strategist_agent
+taskGenDescription.agent = copyright_analyst_agent
 taskGenDescription.context = [taskAnalyzeImage]
+taskGenDescription.output_json = FinalStockMetadata
 
 taskAuditDescription = task_audit_description
 taskAuditDescription.agent = legal_auditor_agent
-taskAuditDescription.context = [taskGenDescription]
+taskAuditDescription.context = [taskAnalyzeImage, taskGenDescription]
 taskAuditDescription.output_json = FinalStockMetadata
 
-metadataFinalFormat = task_format_data
-metadataFinalFormat.agent = metadata_formatter_agent
-metadataFinalFormat.context = [taskAnalyzeImage, taskAuditDescription]
-metadataFinalFormat.output_json = FinalStockMetadata
+taskMetadataFinalFormat = task_format_data
+taskMetadataFinalFormat.agent = metadata_formatter_agent
+taskMetadataFinalFormat.context = [taskAnalyzeImage, taskGenDescription]
+taskMetadataFinalFormat.output_json = FinalStockMetadata
 
 
 shutter_crew = Crew(
-    agents=[visual_analyst_agent, seo_strategist_agent, legal_auditor_agent, metadata_formatter_agent],
-    tasks=[taskAnalyzeImage, taskGenDescription, taskAuditDescription, metadataFinalFormat],
+    agents=[visual_analyst_agent, copyright_analyst_agent],
+    tasks=[taskAnalyzeImage, taskGenDescription],
+    process=Process.sequential,
+    verbose=True
+    )
+
+shutter_crew_gemini = Crew(
+    agents=[visual_analyst_agent, copyright_analyst_agent, metadata_formatter_agent],
+    tasks=[taskAnalyzeImage, taskGenDescription, taskMetadataFinalFormat],
     process=Process.sequential,
     verbose=True
     )
@@ -103,6 +86,9 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
     image_files = []
     for ext in extensions:
         image_files.extend(glob.glob(os.path.join(folder_path, ext)))
+
+    # Windows file matching can return duplicates across upper/lowercase patterns.
+    image_files = list(dict.fromkeys(image_files))
         
     if not image_files:
         print(f"No images in {folder_path}.")
@@ -111,8 +97,8 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
     print(f"Images to process: {len(image_files)}")
     
     # CSV headers that Shutterstock expects
-    # Filename | Title | Keywords
-    csv_headers = ["Filename", "Title", "Keywords", "Status", "Modifications"]
+    # Filename | Description | Title | Keywords | Status | Modifications
+    csv_headers = ["Filename", "Description", "Title", "Keywords", "Status", "Modifications"]
     
     # Check whether the file exists so we don't overwrite previous data
     file_exists = os.path.isfile(output_csv_path)
@@ -134,7 +120,7 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
             
             try:
                 # 1. Run the agent pipeline
-                result = shutter_crew.kickoff(inputs=test_inputs)
+                result = shutter_crew_gemini.kickoff(inputs=test_inputs)
                 
                 title = ""
                 keywords_str = ""
@@ -174,7 +160,7 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
                         raise ValueError("Could not find a JSON structure in the model response")
 
                     # Write clean, filtered data to CSV
-                    writer.writerow([filename, title, keywords_str, status, modifications])
+                    writer.writerow([filename, data_dict.get('visual_data', ''), title, keywords_str, status, modifications])
                     csv_file.flush() # Save immediately to avoid data loss
                     print(f"Successfully written to CSV: {filename}")
                     print(f"   Title: {title[:50]}...")
@@ -201,7 +187,7 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
 #     print(result)
 
 if __name__ == "__main__":
-    TARGET_FOLDER = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\SocialNetworksImages"
+    TARGET_FOLDER = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\SocialNetworksImages\preview"
     OUTPUT_FILE = "./shutterstock_upload.csv"
     
     process_stock_folder(TARGET_FOLDER, OUTPUT_FILE)
