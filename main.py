@@ -1,6 +1,8 @@
 
 import os
 import csv
+import json
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 import glob
@@ -79,7 +81,7 @@ shutter_crew_gemini = Crew(
 def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
     """
     Scans a folder, runs each photo through the CrewAI pipeline,
-    and writes the results to a single CSV file.
+    and writes the results to a single CSV file with clean formatting.
     """
     # Supported formats (Shutterstock accepts JPG/JPEG)
     extensions = ('*.jpg', '*.jpeg', '*.JPG', '*.JPEG')
@@ -122,6 +124,7 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
                 # 1. Run the agent pipeline
                 result = shutter_crew_gemini.kickoff(inputs=test_inputs)
                 
+                description = ""
                 title = ""
                 keywords_str = ""
                 status = "CLEANED_AND_APPROVED"
@@ -130,44 +133,50 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
                 # 2. CHECK OPTION A: CrewAI returned a valid Pydantic object
                 if hasattr(result, 'pydantic') and result.pydantic:
                     data = result.pydantic
+                    description = getattr(data, 'visual_data', '')
                     title = data.title
-                    keywords_str = ", ".join(data.keywords)
+                    keywords_str = ";".join(data.keywords) if isinstance(data.keywords, list) else str(data.keywords)
                     status = getattr(data, 'status', 'APPROVED')
                     modifications = getattr(data, 'modifications_made', '')
                 
                 # 3. CHECK OPTION B: Gemini returned raw JSON text in a string
                 else:
-                    import json
-                    import re
-                    
-                    # Extract response text (in CrewAI this is usually result.raw or str(result))
                     raw_text = result.raw if hasattr(result, 'raw') else str(result)
                     json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                     if json_match:
                         clean_json_str = json_match.group(0)
                         data_dict = json.loads(clean_json_str)
                         
+                        description = data_dict.get('visual_data', '')
                         title = data_dict.get('title', 'Untitled Stock Photo')
                         kw_data = data_dict.get('keywords', [])
-                        if isinstance(kw_data, list):
-                            keywords_str = ";".join(kw_data)
-                        else:
-                            keywords_str = str(kw_data)
-                            
+                        keywords_str = ";".join(kw_data) if isinstance(kw_data, list) else str(kw_data)
                         status = data_dict.get('status', 'CLEANED_AND_APPROVED')
                         modifications = data_dict.get('modifications_made', 'Parsed from JSON string')
                     else:
                         raise ValueError("Could not find a JSON structure in the model response")
 
-                    # Write clean, filtered data to CSV
-                    writer.writerow([filename, data_dict.get('visual_data', ''), title, keywords_str, status, modifications])
-                    csv_file.flush() # Save immediately to avoid data loss
-                    print(f"Successfully written to CSV: {filename}")
-                    print(f"   Title: {title[:50]}...")
-                
+                # Добавляем префиксы строго для сохранения в CSV
+                final_title = f"TitleData: {title}"
+                final_keywords = f"KeywordsData: {keywords_str}"
+
+                # Записываем чистую строчку в CSV (одна строка на одно фото — закон для Шаттера)
+                writer.writerow([filename, description, final_title, final_keywords, status, modifications])
+                csv_file.flush() # Сразу сбрасываем данные на диск
+
+                # --- ВИЗУАЛЬНЫЙ ВЫВОД В КОНСОЛЬ (То, что ты просил для удобства глаз) ---
+                print(f"\n--- [ДАННЫЕ ФАЙЛА УСПЕШНО ЗАПИСАНЫ] ---")
+                print(f"Filename: {filename}")
+                print(f"Description: {description}")
+                print(f"TitleData: {title}")
+                print(f"KeywordsData: {keywords_str}")
+                print(f"Status: {status}")
+                print(f"Modifications: {modifications}")
+                print(f"----------------------------------------\n") # Пустая строка в конце лога
+
             except Exception as e:
                 print(f"Failed to parse {filename}: {str(e)}")
-                writer.writerow([filename, "ERROR: Parsing Failed", "", "FAILED", str(e)])
+                writer.writerow([filename, "ERROR: Parsing Failed", "", "", "FAILED", str(e)])
                 continue
 
     print(f"\nBatch processing completed! Results saved to: {output_csv_path}")
