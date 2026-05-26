@@ -4,6 +4,7 @@ import csv
 import json
 import re
 from pathlib import Path
+import time
 from dotenv import load_dotenv
 import glob
 from crewai import Crew, Process, Task, LLM
@@ -13,13 +14,10 @@ from pydantic import BaseModel, Field
 from tools import analyze_image_via_ollama
 
 load_dotenv()
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
-LOCAL_MODEL = "ollama/llama3.2:3b"
-#LOCAL_MODEL = "ollama/llama3.1:8b"
-#VISION_MODEL = "llava:7b"
-VISION_MODEL = "moondream:latest"
-#VISION_MODEL = "gemma4:latest"
+OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
+VISION_MODEL = os.getenv("VISION_MODEL")
+PHOTO_INFO = os.getenv("PHOTO_INFO")
 
 class FinalStockMetadata(BaseModel):
     status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
@@ -78,108 +76,150 @@ shutter_crew_gemini = Crew(
     verbose=True
     )
 
+def parse_crew_result(result) -> dict:
+    """
+    Вспомогательная функция для извлечения данных из CrewAI.
+    Возвращает словарь с чистыми строками.
+    """
+    # 1. Если вернулся Pydantic объект
+    if hasattr(result, 'pydantic') and result.pydantic:
+        data = result.pydantic
+        kw = getattr(data, 'keywords', [])
+        return {
+            "description": getattr(data, 'visual_data', ''),
+            "title": getattr(data, 'title', 'Untitled Stock Photo'),
+            "keywords": ";".join(kw) if isinstance(kw, list) else str(kw),
+            "status": getattr(data, 'status', 'APPROVED'),
+            "modifications": getattr(data, 'modifications_made', '')
+        }
+    
+    # 2. Если вернулся raw JSON/текст
+    raw_text = result.raw if hasattr(result, 'raw') else str(result)
+    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+    
+    if json_match:
+        data_dict = json.loads(json_match.group(0))
+        kw = data_dict.get('keywords', [])
+        return {
+            "description": data_dict.get('visual_data', ''),
+            "title": data_dict.get('title', 'Untitled Stock Photo'),
+            "keywords": ";".join(kw) if isinstance(kw, list) else str(kw),
+            "status": data_dict.get('status', 'CLEANED_AND_APPROVED'),
+            "modifications": data_dict.get('modifications_made', 'Parsed from JSON string')
+        }
+        
+    raise ValueError("Could not find a JSON structure in the model response")
+
+
 def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
     """
     Scans a folder, runs each photo through the CrewAI pipeline,
-    and writes the results to a single CSV file with clean formatting.
+    and writes results parallel to CSV and formatted TXT files.
     """
-    # Supported formats (Shutterstock accepts JPG/JPEG)
-    extensions = ('*.jpg', '*.jpeg', '*.JPG', '*.JPEG')
-    image_files = []
-    for ext in extensions:
-        image_files.extend(glob.glob(os.path.join(folder_path, ext)))
+    folder = Path(folder_path)
+    # Современный поиск файлов: ищет jpeg/jpg в любом регистре без дубликатов
+    extensions = {'.jpg', '.jpeg'}
+    image_files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in extensions]
 
-    # Windows file matching can return duplicates across upper/lowercase patterns.
-    image_files = list(dict.fromkeys(image_files))
-        
     if not image_files:
         print(f"No images in {folder_path}.")
         return
 
     print(f"Images to process: {len(image_files)}")
     
-    # CSV headers that Shutterstock expects
-    # Filename | Description | Title | Keywords | Status | Modifications
+    # Формируем путь для TXT (с тем же именем, что и CSV)
+    output_txt_path = Path(output_csv_path).with_suffix('.txt')
+    
     csv_headers = ["Filename", "Description", "Title", "Keywords", "Status", "Modifications"]
+    csv_exists = Path(output_csv_path).is_file()
     
-    # Check whether the file exists so we don't overwrite previous data
-    file_exists = os.path.isfile(output_csv_path)
-    
-    with open(output_csv_path, mode='a', newline='', encoding='utf-8') as csv_file:
+    # Открываем оба файла параллельно
+    with open(output_csv_path, mode='a', newline='', encoding='utf-8') as csv_file, \
+         open(output_txt_path, mode='a', encoding='utf-8') as txt_file:
+        
         writer = csv.writer(csv_file, delimiter=',')
-        if not file_exists:
-            writer.writerow(csv_headers) # Write the header only once
+        if not csv_exists:
+            writer.writerow(csv_headers)
             
         for index, img_path in enumerate(image_files, start=1):
-            filename = os.path.basename(img_path)
+            filename = img_path.name
             print(f"\n[{index}/{len(image_files)}] Processing: {filename}...")
             
             test_inputs = {
-                "image_path": img_path,
+                "image_path": str(img_path),
                 "OLLAMA_HOST": OLLAMA_HOST,
-                "OLLAMA_MODEL": VISION_MODEL
+                "OLLAMA_MODEL": VISION_MODEL,
+                "PHOTO_INFO": PHOTO_INFO
             }
             
             try:
-                # 1. Run the agent pipeline
+                # Запуск пайплайна
                 result = shutter_crew_gemini.kickoff(inputs=test_inputs)
                 
-                description = ""
-                title = ""
-                keywords_str = ""
-                status = "CLEANED_AND_APPROVED"
-                modifications = "Processed successfully"
-
-                # 2. CHECK OPTION A: CrewAI returned a valid Pydantic object
-                if hasattr(result, 'pydantic') and result.pydantic:
-                    data = result.pydantic
-                    description = getattr(data, 'visual_data', '')
-                    title = data.title
-                    keywords_str = ";".join(data.keywords) if isinstance(data.keywords, list) else str(data.keywords)
-                    status = getattr(data, 'status', 'APPROVED')
-                    modifications = getattr(data, 'modifications_made', '')
+                # Парсинг данных через внешнюю функцию
+                res_data = parse_crew_result(result)
                 
-                # 3. CHECK OPTION B: Gemini returned raw JSON text in a string
-                else:
-                    raw_text = result.raw if hasattr(result, 'raw') else str(result)
-                    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-                    if json_match:
-                        clean_json_str = json_match.group(0)
-                        data_dict = json.loads(clean_json_str)
-                        
-                        description = data_dict.get('visual_data', '')
-                        title = data_dict.get('title', 'Untitled Stock Photo')
-                        kw_data = data_dict.get('keywords', [])
-                        keywords_str = ";".join(kw_data) if isinstance(kw_data, list) else str(kw_data)
-                        status = data_dict.get('status', 'CLEANED_AND_APPROVED')
-                        modifications = data_dict.get('modifications_made', 'Parsed from JSON string')
-                    else:
-                        raise ValueError("Could not find a JSON structure in the model response")
+                # Добавляем префиксы для сохранения
+                final_title = f"TitleData: {res_data['title']}"
+                final_keywords = f"KeywordsData: {res_data['keywords']}"
+                
+                # 1. Запись в CSV
+                writer.writerow([
+                    filename, 
+                    res_data['description'], 
+                    final_title, 
+                    final_keywords, 
+                    res_data['status'], 
+                    res_data['modifications']
+                ])
+                csv_file.flush()
 
-                # Добавляем префиксы строго для сохранения в CSV
-                final_title = f"TitleData: {title}"
-                final_keywords = f"KeywordsData: {keywords_str}"
+                # 2. Запись в TXT (каждое поле с новой строки + пустая строка в конце)
+                txt_file.write(
+                    f"Filename: {filename}\n"
+                    f"Description: {res_data['description']}\n"
+                    f"Title: {final_title}\n"
+                    f"Keywords: {final_keywords}\n"
+                    f"Status: {res_data['status']}\n"
+                    f"Modifications: {res_data['modifications']}\n"
+                    f"\n" # Пропуск строки между фотографиями
+                )
+                txt_file.flush()
 
-                # Записываем чистую строчку в CSV (одна строка на одно фото — закон для Шаттера)
-                writer.writerow([filename, description, final_title, final_keywords, status, modifications])
-                csv_file.flush() # Сразу сбрасываем данные на диск
-
-                # --- ВИЗУАЛЬНЫЙ ВЫВОД В КОНСОЛЬ (То, что ты просил для удобства глаз) ---
+                # Вывод в консоль
                 print(f"\n--- [ДАННЫЕ ФАЙЛА УСПЕШНО ЗАПИСАНЫ] ---")
                 print(f"Filename: {filename}")
-                print(f"Description: {description}")
-                print(f"TitleData: {title}")
-                print(f"KeywordsData: {keywords_str}")
-                print(f"Status: {status}")
-                print(f"Modifications: {modifications}")
-                print(f"----------------------------------------\n") # Пустая строка в конце лога
+                print(f"Description: {res_data['description']}")
+                print(f"{final_title}")
+                print(f"{final_keywords}")
+                print(f"Status: {res_data['status']}")
+                print(f"Modifications: {res_data['modifications']}")
+                print(f"----------------------------------------\n")
+                
+                time.sleep(4)
 
             except Exception as e:
-                print(f"Failed to parse {filename}: {str(e)}")
-                writer.writerow([filename, "ERROR: Parsing Failed", "", "", "FAILED", str(e)])
+                error_msg = str(e)
+                print(f"Failed to parse {filename}: {error_msg}")
+                
+                # Пишем ошибку в CSV
+                writer.writerow([filename, "ERROR: Parsing Failed", "", "", "FAILED", error_msg])
+                csv_file.flush()
+                
+                # Пишем ошибку в TXT, сохраняя структуру
+                txt_file.write(
+                    f"Filename: {filename}\n"
+                    f"Description: ERROR: Parsing Failed\n"
+                    f"Title: \n"
+                    f"Keywords: \n"
+                    f"Status: FAILED\n"
+                    f"Modifications: {error_msg}\n"
+                    f"\n"
+                )
+                txt_file.flush()
                 continue
 
-    print(f"\nBatch processing completed! Results saved to: {output_csv_path}")
+  
     
 # if __name__ == "__main__":
 #     image_path = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\SocialNetworksImages\windmill-4.jpg"
@@ -196,7 +236,7 @@ def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
 #     print(result)
 
 if __name__ == "__main__":
-    TARGET_FOLDER = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\SocialNetworksImages\preview"
+    TARGET_FOLDER = r"D:\Photo\Edited\ByDate\2026_Edited\Preview"
     OUTPUT_FILE = "./shutterstock_upload.csv"
     
     process_stock_folder(TARGET_FOLDER, OUTPUT_FILE)

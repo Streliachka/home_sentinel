@@ -1,5 +1,7 @@
 # tools.py
+import base64
 import ipaddress
+from pathlib import Path
 import re
 import subprocess
 import requests
@@ -145,15 +147,41 @@ def flexible_nmap(subnet: str, options: str = "-F"):
     
 
 @tool("analyze_image_via_ollama")
-def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: str) -> str:
-    """Analyze the image at image_path using Ollama and return a detailed literal description."""
-    import base64
-    
+def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: str, PHOTO_INFO: str = None) -> str:
+    """
+    Analyze the image at image_path using Ollama and return a detailed literal description.
+    Accepts optional PHOTO_INFO string containing extra metadata for matching files.
+    """
     try:
+        current_filename = Path(image_path).stem
+        additional_context = ""
+        
+        # 1. Быстрая проверка: если PHOTO_INFO пустой/null или имени файла в нем вообще нет — полностью игнорируем парсинг
+        if PHOTO_INFO and str(PHOTO_INFO).strip() and (current_filename in PHOTO_INFO):
+            
+            # 2. Только если имя файла нашлось как подстрока, парсим всю структуру
+            extra_info_dict = {}
+            pairs = PHOTO_INFO.split(';')
+            for pair in pairs:
+                if '=' in pair:
+                    filename, info = pair.split('=', 1)
+                    extra_info_dict[filename.strip()] = info.strip()
+
+            # Достаем точный контекст именно для текущего файла
+            additional_context = extra_info_dict.get(current_filename, "")
+
+        # 3. Формируем базовый промпт для модели
+        base_prompt = "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?"
+        
+        # Добавляем контекст, только если он был успешно найден
+        if additional_context:
+            base_prompt += f"\n\nAdditional context or user notes for this specific image: {additional_context}"
+
+        # Читаем изображение и кодируем в base64
         with open(image_path, "rb") as f:
             img_str = base64.b64encode(f.read()).decode('utf-8')
 
-        # Warm up the model first: this triggers Ollama to load it into memory.
+        # Прогрев модели (Warm up) для загрузки в память Ollama
         warmup_payload = {
             "model": OLLAMA_MODEL,
             "prompt": "ping",
@@ -161,6 +189,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             "options": {"num_predict": 1},
             "keep_alive": "10m"
         }
+        
         warmup_response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
             json=warmup_payload,
@@ -169,23 +198,24 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
         if warmup_response.status_code != 200:
             return f"Error loading model in Ollama: {warmup_response.text}"
             
-        # Call your local Ollama API directly
+        # Основной запрос к Ollama API
         payload = {
             "model": OLLAMA_MODEL,
-            "prompt": "Describe this image in detail for a microstock presentation. What objects, colors, and potential trademark risks do you see?",
+            "prompt": base_prompt,
             "stream": False,
             "images": [img_str]
         }
         
-        # OLLAMA_HOST is taken from your environment variables
         response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
             json=payload,
             timeout=180
         )
+        
         if response.status_code == 200:
             return response.json().get("response", "No response from model.")
         return f"Error from Ollama: {response.text}"
+
     except requests.exceptions.RequestException as e:
         return f"Ollama API request failed: {str(e)}"
     except Exception as e:

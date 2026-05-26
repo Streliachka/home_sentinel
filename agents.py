@@ -1,14 +1,16 @@
 import os
-
 from crewai import LLM, Agent
 from dotenv import load_dotenv
 from tools import scan_network_logic, get_vendor_logic, flexible_nmap
 
-LOCAL_MODEL = "ollama/llama3.2:3b"
-LOCAL_MODEL_PLUS = "ollama/llama3.1:8b"
-VISION_MODEL = "moondream:latest"
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 load_dotenv()
+
+OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
+VISION_MODEL = os.getenv("VISION_MODEL")
+LOCAL_MODEL = os.getenv("LOCAL_MODEL")
+LOCAL_MODEL_PLUS = os.getenv("LOCAL_MODEL_PLUS")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL")
 
 if not os.getenv("GEMINI_API_KEY"):
     raise ValueError("no gemini API key found.")
@@ -31,9 +33,9 @@ VISION_MODEL_OBJ = LLM(
 )
 
 GEMINI = LLM(
-    model="google/gemini-3.5-flash",
+    model=GEMINI_MODEL,
     temperature=0.0,
-    api_key=os.getenv("GEMINI_API_KEY")
+    api_key=GEMINI_API_KEY
 )
 
 watcher = Agent(
