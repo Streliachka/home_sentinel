@@ -1,20 +1,28 @@
-Filename: kks-1.jpg
-Description: A dramatic, wide-angle shot capturing the institutional grandeur of the Kuks Hospital grounds in the Czech Republic. The scene is dominated by a structured pathway leading through lush, temperate foliage, creating a strong contrast between natural growth and formal European architecture. In the foreground, vibrant sunflowers and deep green foliage thrive along a gravel path, guiding the eye toward the historic manor building in the background. The midground features carefully maintained hedges and a tall, classical stone obelisk, anchoring the composition. The pale yellow facade and dark roofing of the building suggest a history of academic or medical use, conveying a sense of permanence and European heritage. The entire scene is bathed in the dramatic, soft light of a heavy, overcast sky, lending a mood that is both melancholy and majestic.
-Title: TitleData: Historic Kuks Hospital grounds with sunflowers and obelisk under dramatic overcast sky
-Keywords: KeywordsData: kuks hospital;czech republic;obelisk;gravel path;sunflowers;historic building;european architecture;baroque garden;overcast sky;dramatic clouds;monument;manor house;hedges;foliage;yellow flowers;green leaves;stone column;historic site;travel destination;czech landmark;majestic mood;melancholy atmosphere;wide angle;outdoor park;formal garden;heritage building;yellow facade;dark roof;summer day;cloudy weather;scenic landscape;classical style;old hospital;bohemia;tourist attraction;garden path;manicured lawn;historic estate;architectural heritage;dramatic sky;nature walk;european heritage
+Filename: chdvdji-2.jpg
+Description: Large green field with multiple rows of crops planted at regular intervals. Black line running horizontally across the center of the field. Two distinct sections of the field, one with more rows of crops and the other with less dense crops. Aerial view from above. Green field with brown or gray border around the field.
+Title: TitleData: Large green field with multiple rows of crops planted at regular intervals
+Keywords: KeywordsData: green;field;crops;rows;black line;horizontal;center;sections;density;aerial view
+Status: CLEANED_AND_APPROVED
+Modifications: None
 
-Filename: kks-2.jpg
-Description: A sweeping, cinematic view of a grand European historical estate, likely a former hospital, manor, or palace. The scene is characterized by intense symmetry and highly formal landscaping, suggesting a Baroque or Neoclassical architectural tradition.
-Title: TitleData: Symmetrical European historical estate with formal baroque garden under overcast sky
-Keywords: KeywordsData: baroque;neoclassical;european;estate;manor;garden;formal garden;topiary;symmetry;obelisk;architecture;travel;culture;czech republic;historical;hospital;palace;luxury;heritage;grand;overcast;facade;manor house;landscaping;gravel path;stone path;hedges;fountain;basin;pillar;monument;landmark;tourism;exterior;scenic;cinematic;park;chateau;castle;classicism;historic site;old building;cloudy sky;green hedges;bohemia
+Filename: chdvdji-4.jpg
+Description: The main subject of the image is a field with a dirt road running through it. The left side of the field has trees and shrubs. The right side of the field has open space. There are two distinct sections of the field separated by the road. The sky above the field is a clear blue color. The field appears to be covered in lush green vegetation.
+Title: TitleData: Rural landscape with dirt road dividing a field
+Keywords: KeywordsData: dirt road;field;trees;shrubs;open space;clear sky;lush green
+Status: CLEANED_AND_APPROVED
+Modifications: None
 
-Filename: kks-3.jpg
-Description: A historical building complex (identified as Hospital Kuks) occupies the mid-ground. Dense, dark green foliage frames the foreground, creating a sense of depth. An antique, wrought-iron gate is visible within the foliage. A pathway or driveway leads from the gate towards the main building. Manicured lawns and paths are visible beyond the immediate greenery. The sky is heavily overcast, creating a soft, diffused light. The location is specifically in the Czech Republic.
-Title: TitleData: Historic Hospital Kuks baroque complex in Czech Republic under overcast sky
-Keywords: KeywordsData: hospital kuks;kuks;czech republic;czechia;bohemia;historical building;historic landmark;baroque architecture;wrought iron;iron gate;antique gate;green foliage;dark green;garden path;driveway;manicured lawn;overcast sky;cloudy day;diffused light;moody atmosphere;travel destination;european heritage;old palace;chateau garden;monastery complex;vintage exterior;scenic view;landscape design;park pathway;historic estate;tourism czech;east europe;outdoor scene;architectural heritage;stone path;metal gate;green bushes;framing effect;tourist attraction;famous landmark
+Filename: chdvdji_1.jpg
+Description: The main subject is an aerial view of a lush green field. The field has several smaller islands scattered throughout its expanse. A winding road runs through the middle of the field, leading towards one of the larger islands. There are trees on both sides of the island that the road leads to. The dominant colors in the image are shades of green and brown. No discernible texts or human-made objects are visible in the image.
+Title: TitleData: Aerial view of a lush green field with winding road through smaller islands
+Keywords: KeywordsData: aerial view;lush green field;winding road;smaller islands;trees;green;brown;nature;landscape
+Status: CLEANED_AND_APPROVED
+Modifications: None
 
-Filename: kks-4.jpg
-Description: A framed view of a historical European estate and vineyard landscape on an overcast day. The image is composed with a prominent, blurred foreground of red flowers and dark foliage, creating a natural frame (bokeh effect). Rolling green hills, cultivated vineyards, and in the distance, a large, historical, white or light-colored architectural complex (Hospital Kuks) are visible through this frame. The sky is heavily overcast, suggesting dramatic or changeable weather.
-Title: TitleData: Scenic view of historical European estate and vineyard under overcast sky
-Keywords: KeywordsData: estate;vineyard;landscape;overcast;bokeh;red flowers;dark foliage;rolling hills;green hills;agriculture;farming;wine region;winery;historical;architecture;building;monument;baroque;kuks;hospital kuks;czech republic;bohemia;european;heritage;landmark;sky;clouds;dramatic sky;grey clouds;cloudy;outdoor;travel;tourism;scenic;countryside;rural;nature;valley;meadow;foreground;blurred;floral;garden;plants;leaves
+Filename: chdvsn-2.jpg
+Description: The image features power lines stretching across the frame. The sun is setting behind the power lines. Long shadows are cast by the power lines, adding depth to the scene. A tall smokestack stands out prominently in the background. The sky has a warm orange and pink hue due to sunset. There are text elements "TM" and "TM" visible in the image.
+Title: TitleData: Power lines at sunset with smokestack
+Keywords: KeywordsData: power lines;sunset;smokestack;long shadows;orange sky;pink hue
+Status: CLEANED_AND_APPROVED
+Modifications: None
 

@@ -145,6 +145,9 @@ ENV/
 env.bak/
 venv.bak/
 
+*.txt
+*.log
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -208,3 +211,12 @@ marimo/_lsp/
 __marimo__/
 
 *.csv
+
+# Generated project artifacts
+*_profile.json
+comprehensive_style_report.json
+FINAL_PRO_PRODUCTION_GUIDE.md
+styleData/
+tmp_style_*/
+tmp_empty_shutter/
+

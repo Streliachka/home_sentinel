@@ -1,242 +1,213 @@
 
+import argparse
 import os
-import csv
-import json
-import re
+import sys
 from pathlib import Path
-import time
+
 from dotenv import load_dotenv
-import glob
-from crewai import Crew, Process, Task, LLM
-from agents import visual_analyst, copyright_analyst, legal_auditor, metadata_formatter
-from tasks import task_analyze_image,task_gen_description, task_audit_description, task_format_data
-from pydantic import BaseModel, Field
-from tools import analyze_image_via_ollama
 
-load_dotenv()
+from shared.functions.stock_metadata import process_stock_folder
 
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
-VISION_MODEL = os.getenv("VISION_MODEL")
-PHOTO_INFO = os.getenv("PHOTO_INFO")
 
-class FinalStockMetadata(BaseModel):
-    status: str = Field(description="Must be 'CLEANED_AND_APPROVED'")
-    modifications_made: str = Field(description="None or description of edits")
-    visual_data: str = Field(
-        description="Original literal visual description from the visual analyst. This is the unedited, raw description of what is in the image. It should not be changed by the SEO or Legal agents, but it should be included in the final output for reference."
+CREW_CHOICES = ["shutter_crew", "shutter_crew_gemini", "sentinel_crew", "style_crew"]
+
+COMMAND_ALIASES = {
+    "shutter": "metadata",
+}
+
+LEGACY_CREW_HINTS = {
+    "shutter_crew": "For shutter crews, use subcommand mode: python main.py shutter --crew <crew_name> --target-folder <path> (or python main.py metadata ...).",
+    "shutter_crew_gemini": "For shutter crews, use subcommand mode: python main.py shutter --crew <crew_name> --target-folder <path> (or python main.py metadata ...).",
+    "sentinel_crew": "Use: python main.py sentinel_crew --subnet <cidr>",
+    "style_crew": "Use: python main.py style_crew --root-directory <path>",
+}
+
+
+def _build_legacy_shutter_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run metadata/shutter flow in legacy mode.")
+    parser.add_argument("--crew", choices=["shutter_crew", "shutter_crew_gemini"], default="shutter_crew")
+    parser.add_argument("--target-folder", required=True, help="Folder with images to process.")
+    parser.add_argument("--output-file", default="./shutterstock_upload.csv", help="CSV output path.")
+    parser.add_argument(
+        "--ollama-host",
+        default=os.getenv("OLLAMA_BASE_URL"),
+        help="Ollama base URL. Defaults to OLLAMA_BASE_URL.",
     )
-    title: str = Field(
-        description="A natural, descriptive English sentence (7-15 words). NO '+' signs, NO slashes."
+    parser.add_argument(
+        "--ollama-model",
+        default=os.getenv("VISION_MODEL"),
+        help="Vision model name. Defaults to VISION_MODEL.",
     )
-    keywords: list[str] = Field(
-        description="List of 35-45 STRICTLY SINGLE WORDS or 2-word phrases max separated by ';'. All lowercase. Absolutely NO long sentences, NO phrases with 'and'. Example: ['cyberpunk'; 'leather corset'; 'prague'; 'winter'; 'sunset']."
+    parser.add_argument(
+        "--photo-info",
+        default=os.getenv("PHOTO_INFO"),
+        help="Optional PHOTO_INFO metadata string.",
     )
+    parser.add_argument("--delay-sec", type=float, default=4.0, help="Delay between images.")
+    return parser
 
 
-# Agents
-visual_analyst_agent = visual_analyst
-visual_analyst_agent.tools = [analyze_image_via_ollama]
-
-copyright_analyst_agent = copyright_analyst
-
-legal_auditor_agent = legal_auditor
-metadata_formatter_agent = metadata_formatter
-
-# Tasks
-taskAnalyzeImage = task_analyze_image
-taskAnalyzeImage.agent = visual_analyst_agent
-
-taskGenDescription = task_gen_description
-taskGenDescription.agent = copyright_analyst_agent
-taskGenDescription.context = [taskAnalyzeImage]
-taskGenDescription.output_json = FinalStockMetadata
-
-taskAuditDescription = task_audit_description
-taskAuditDescription.agent = legal_auditor_agent
-taskAuditDescription.context = [taskAnalyzeImage, taskGenDescription]
-taskAuditDescription.output_json = FinalStockMetadata
-
-taskMetadataFinalFormat = task_format_data
-taskMetadataFinalFormat.agent = metadata_formatter_agent
-taskMetadataFinalFormat.context = [taskAnalyzeImage, taskGenDescription]
-taskMetadataFinalFormat.output_json = FinalStockMetadata
-
-
-shutter_crew = Crew(
-    agents=[visual_analyst_agent, copyright_analyst_agent],
-    tasks=[taskAnalyzeImage, taskGenDescription],
-    process=Process.sequential,
-    verbose=True
+def _add_shutter_like_parser(
+    subparsers: argparse._SubParsersAction,
+    command_name: str,
+    help_text: str,
+    aliases: list[str] | None = None,
+) -> None:
+    parser = subparsers.add_parser(command_name, help=help_text, aliases=aliases or [])
+    parser.add_argument("--crew", choices=["shutter_crew", "shutter_crew_gemini"], default="shutter_crew")
+    parser.add_argument("--target-folder", required=True, help="Folder with images to process.")
+    parser.add_argument("--output-file", default="./shutterstock_upload.csv", help="CSV output path.")
+    parser.add_argument(
+        "--ollama-host",
+        default=os.getenv("OLLAMA_BASE_URL"),
+        help="Ollama base URL. Defaults to OLLAMA_BASE_URL.",
     )
-
-shutter_crew_gemini = Crew(
-    agents=[visual_analyst_agent, copyright_analyst_agent, metadata_formatter_agent],
-    tasks=[taskAnalyzeImage, taskGenDescription, taskMetadataFinalFormat],
-    process=Process.sequential,
-    verbose=True
+    parser.add_argument(
+        "--ollama-model",
+        default=os.getenv("VISION_MODEL"),
+        help="Vision model name. Defaults to VISION_MODEL.",
     )
+    parser.add_argument(
+        "--photo-info",
+        default=os.getenv("PHOTO_INFO"),
+        help="Optional PHOTO_INFO metadata string.",
+    )
+    parser.add_argument("--delay-sec", type=float, default=4.0, help="Delay between images.")
 
-def parse_crew_result(result) -> dict:
-    """
-    Вспомогательная функция для извлечения данных из CrewAI.
-    Возвращает словарь с чистыми строками.
-    """
-    # 1. Если вернулся Pydantic объект
-    if hasattr(result, 'pydantic') and result.pydantic:
-        data = result.pydantic
-        kw = getattr(data, 'keywords', [])
-        return {
-            "description": getattr(data, 'visual_data', ''),
-            "title": getattr(data, 'title', 'Untitled Stock Photo'),
-            "keywords": ";".join(kw) if isinstance(kw, list) else str(kw),
-            "status": getattr(data, 'status', 'APPROVED'),
-            "modifications": getattr(data, 'modifications_made', '')
+
+def _handle_metadata_like_command(args: argparse.Namespace) -> None:
+    from crew.metadata_crew import shutter_crew, shutter_crew_gemini
+
+    if not args.ollama_host:
+        raise ValueError("--ollama-host is required (or set OLLAMA_BASE_URL)")
+    if not args.ollama_model:
+        raise ValueError("--ollama-model is required (or set VISION_MODEL)")
+    if args.crew == "shutter_crew_gemini" and shutter_crew_gemini is None:
+        raise ValueError("shutter_crew_gemini requires GEMINI_API_KEY and GEMINI_MODEL to be configured.")
+
+    selected = shutter_crew if args.crew == "shutter_crew" else shutter_crew_gemini
+    print(f"Starting metadata flow with crew: {args.crew}")
+    process_stock_folder(
+        folder_path=args.target_folder,
+        output_csv_path=args.output_file,
+        selected_crew=selected,
+        ollama_host=args.ollama_host,
+        ollama_model=args.ollama_model,
+        photo_info=args.photo_info,
+        delay_sec=args.delay_sec,
+    )
+    print("Metadata batch completed.")
+
+
+def _handle_sentinel_command(args: argparse.Namespace) -> None:
+    from crew.sentinel_crew import sentinel_crew
+
+    print("Starting crew: sentinel_crew")
+    result = sentinel_crew.kickoff(inputs={"subnet": args.subnet})
+    print("\nCrew Result:\n")
+    print(result)
+
+
+def _handle_style_command(args: argparse.Namespace) -> None:
+    from crew.style_crew import photo_analysis_crew, style_report_task, style_final_guide_task
+
+    style_data_path = Path(args.style_data_dir)
+    if not style_data_path.is_absolute():
+        style_data_path = Path.cwd() / style_data_path
+    style_data_path.mkdir(parents=True, exist_ok=True)
+
+    # Keep task output files aligned with the runtime workspace selected via --style-data-dir.
+    style_report_task.output_file = str(style_data_path / "comprehensive_style_report.json")
+    style_final_guide_task.output_file = str(style_data_path / "FINAL_PRO_PRODUCTION_GUIDE.md")
+
+    print("Starting crew: style_crew")
+    result = photo_analysis_crew.kickoff(
+        inputs={
+            "root_directory": args.root_directory,
+            "style_data_dir": str(style_data_path),
         }
-    
-    # 2. Если вернулся raw JSON/текст
-    raw_text = result.raw if hasattr(result, 'raw') else str(result)
-    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-    
-    if json_match:
-        data_dict = json.loads(json_match.group(0))
-        kw = data_dict.get('keywords', [])
-        return {
-            "description": data_dict.get('visual_data', ''),
-            "title": data_dict.get('title', 'Untitled Stock Photo'),
-            "keywords": ";".join(kw) if isinstance(kw, list) else str(kw),
-            "status": data_dict.get('status', 'CLEANED_AND_APPROVED'),
-            "modifications": data_dict.get('modifications_made', 'Parsed from JSON string')
-        }
-        
-    raise ValueError("Could not find a JSON structure in the model response")
+    )
+    print("\nCrew Result:\n")
+    print(result)
 
 
-def process_stock_folder(folder_path, output_csv_path="shutterstock_batch.csv"):
-    """
-    Scans a folder, runs each photo through the CrewAI pipeline,
-    and writes results parallel to CSV and formatted TXT files.
-    """
-    folder = Path(folder_path)
-    # Современный поиск файлов: ищет jpeg/jpg в любом регистре без дубликатов
-    extensions = {'.jpg', '.jpeg'}
-    image_files = [f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in extensions]
+COMMAND_HANDLERS = {
+    "metadata": _handle_metadata_like_command,
+    "sentinel_crew": _handle_sentinel_command,
+    "style_crew": _handle_style_command,
+}
 
-    if not image_files:
-        print(f"No images in {folder_path}.")
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run one of the available crews.")
+    parser.add_argument(
+        "--crew",
+        choices=CREW_CHOICES,
+        help="Legacy mode without subcommands. Use subcommands for cleaner help.",
+    )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    _add_shutter_like_parser(
+        subparsers,
+        "metadata",
+        "Run metadata/shutter flow in folder batch mode.",
+        aliases=["shutter"],
+    )
+
+    sentinel_parser = subparsers.add_parser("sentinel_crew", help="Run sentinel crew.")
+    sentinel_parser.add_argument("--subnet", required=True, help="Subnet/CIDR, e.g. 192.168.1.0/24")
+
+    style_parser = subparsers.add_parser("style_crew", help="Run style crew.")
+    style_parser.add_argument("--root-directory", required=True, help="Root folder for style processing.")
+    style_parser.add_argument(
+        "--style-data-dir",
+        default="./styleData",
+        help="Workspace folder used by style_crew for intermediate and final artifacts.",
+    )
+
+    return parser
+
+
+def run_legacy_mode(args: argparse.Namespace):
+    if args.crew in LEGACY_CREW_HINTS:
+        raise ValueError(LEGACY_CREW_HINTS[args.crew])
+    raise ValueError("Unknown crew mode")
+
+
+def run_subcommand_mode(args: argparse.Namespace):
+    normalized_command = COMMAND_ALIASES.get(args.command, args.command)
+    handler = COMMAND_HANDLERS.get(normalized_command)
+    if handler is None:
+        raise ValueError("Unknown subcommand")
+    handler(args)
+
+
+def main() -> None:
+    load_dotenv()
+
+    legacy_argv = sys.argv[1:]
+    if "--crew" in legacy_argv:
+        crew_index = legacy_argv.index("--crew")
+        if crew_index + 1 < len(legacy_argv) and legacy_argv[crew_index + 1] in {"shutter_crew", "shutter_crew_gemini"}:
+            legacy_parser = _build_legacy_shutter_parser()
+            legacy_args = legacy_parser.parse_args(legacy_argv)
+            _handle_metadata_like_command(legacy_args)
+            return
+
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command:
+        run_subcommand_mode(args)
         return
 
-    print(f"Images to process: {len(image_files)}")
-    
-    # Формируем путь для TXT (с тем же именем, что и CSV)
-    output_txt_path = Path(output_csv_path).with_suffix('.txt')
-    
-    csv_headers = ["Filename", "Description", "Title", "Keywords", "Status", "Modifications"]
-    csv_exists = Path(output_csv_path).is_file()
-    
-    # Открываем оба файла параллельно
-    with open(output_csv_path, mode='a', newline='', encoding='utf-8') as csv_file, \
-         open(output_txt_path, mode='a', encoding='utf-8') as txt_file:
-        
-        writer = csv.writer(csv_file, delimiter=',')
-        if not csv_exists:
-            writer.writerow(csv_headers)
-            
-        for index, img_path in enumerate(image_files, start=1):
-            filename = img_path.name
-            print(f"\n[{index}/{len(image_files)}] Processing: {filename}...")
-            
-            test_inputs = {
-                "image_path": str(img_path),
-                "OLLAMA_HOST": OLLAMA_HOST,
-                "OLLAMA_MODEL": VISION_MODEL,
-                "PHOTO_INFO": PHOTO_INFO
-            }
-            
-            try:
-                # Запуск пайплайна
-                result = shutter_crew_gemini.kickoff(inputs=test_inputs)
-                
-                # Парсинг данных через внешнюю функцию
-                res_data = parse_crew_result(result)
-                
-                # Добавляем префиксы для сохранения
-                final_title = f"TitleData: {res_data['title']}"
-                final_keywords = f"KeywordsData: {res_data['keywords']}"
-                
-                # 1. Запись в CSV
-                writer.writerow([
-                    filename, 
-                    res_data['description'], 
-                    final_title, 
-                    final_keywords, 
-                    res_data['status'], 
-                    res_data['modifications']
-                ])
-                csv_file.flush()
+    if args.crew:
+        run_legacy_mode(args)
+        return
 
-                # 2. Запись в TXT (каждое поле с новой строки + пустая строка в конце)
-                txt_file.write(
-                    f"Filename: {filename}\n"
-                    f"Description: {res_data['description']}\n"
-                    f"Title: {final_title}\n"
-                    f"Keywords: {final_keywords}\n"
-                    f"Status: {res_data['status']}\n"
-                    f"Modifications: {res_data['modifications']}\n"
-                    f"\n" # Пропуск строки между фотографиями
-                )
-                txt_file.flush()
+    parser.print_help()
 
-                # Вывод в консоль
-                print(f"\n--- [ДАННЫЕ ФАЙЛА УСПЕШНО ЗАПИСАНЫ] ---")
-                print(f"Filename: {filename}")
-                print(f"Description: {res_data['description']}")
-                print(f"{final_title}")
-                print(f"{final_keywords}")
-                print(f"Status: {res_data['status']}")
-                print(f"Modifications: {res_data['modifications']}")
-                print(f"----------------------------------------\n")
-                
-                time.sleep(4)
-
-            except Exception as e:
-                error_msg = str(e)
-                print(f"Failed to parse {filename}: {error_msg}")
-                
-                # Пишем ошибку в CSV
-                writer.writerow([filename, "ERROR: Parsing Failed", "", "", "FAILED", error_msg])
-                csv_file.flush()
-                
-                # Пишем ошибку в TXT, сохраняя структуру
-                txt_file.write(
-                    f"Filename: {filename}\n"
-                    f"Description: ERROR: Parsing Failed\n"
-                    f"Title: \n"
-                    f"Keywords: \n"
-                    f"Status: FAILED\n"
-                    f"Modifications: {error_msg}\n"
-                    f"\n"
-                )
-                txt_file.flush()
-                continue
-
-  
-    
-# if __name__ == "__main__":
-#     image_path = r"C:\Users\oprokopenko\Dropbox\Actum\Photo\SocialNetworksImages\windmill-4.jpg"
-#     test_inputs = {
-#             "image_path": image_path,
-#             "OLLAMA_HOST": OLLAMA_HOST,
-#             "OLLAMA_MODEL": VISION_MODEL,
-#         }
-
-#     print("Starting local Microstock CrewAI Factory...")
-#     result = shutter_crew.kickoff(inputs=test_inputs)
-
-#     print("\nFINAL LEGALLY SAFE METADATA RESULT:")
-#     print(result)
 
 if __name__ == "__main__":
-    TARGET_FOLDER = r"D:\Photo\Edited\ByDate\2026_Edited\Preview"
-    OUTPUT_FILE = "./shutterstock_upload.csv"
-    
-    process_stock_folder(TARGET_FOLDER, OUTPUT_FILE)
+    main()
