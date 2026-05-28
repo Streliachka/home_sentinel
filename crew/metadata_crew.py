@@ -34,8 +34,8 @@ if metadata_formatter_agent is not None:
 
 
 shutter_crew = Crew(
-    agents=[visual_analyst_agent, copyright_analyst_agent],
-    tasks=[taskAnalyzeImage, taskGenDescription],
+    agents=[visual_analyst_agent, copyright_analyst_agent, legal_auditor_agent],
+    tasks=[taskAnalyzeImage, taskGenDescription, taskAuditDescription],
     process=Process.sequential,
     verbose=True
     )

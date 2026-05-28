@@ -17,6 +17,7 @@ task_gen_description = Task(
     on Shutterstock, while strictly following microstock rules.
 
     CRITICAL KEYWORD RULES:
+    0. TARGET KEYWORD COUNT: return 35-50 keywords.
     1. Every keyword must be a SINGLE WORD (e.g., 'cyberpunk', 'boots', 'sunset') or a maximum of a 2-WORD PHRASE.
     2. Absolutely FORBIDDEN to use long descriptions, sentences, or phrases with the word 'and' inside the keywords array.
     3. Do NOT invent objects if they are not in the visual description.
@@ -54,6 +55,11 @@ task_audit_description = Task(
         - Cross-check the RAW SEO keywords against the ORIGINAL VISUAL FACTS.
         - If the RAW SEO agent invented objects, actions, or concepts not supported by the visual facts (such as 'laptop', 'coffee', 'office', 'remote work setup', 'working from home' when there is only a balcony and a sunset), DELETE THEM IMMEDIATELY. Fake keywords lower the image's conversion rate and violate Shutterstock TOS.
 
+        LAW 4: THE KEYWORD COUNT RULE
+        - Final keywords list must contain 35-50 keywords.
+        - If the list is shorter, enrich it only with concepts directly supported by ORIGINAL VISUAL FACTS.
+        - Never add concepts that are not visible in the image.
+
         ---
         INPUT 1 (ORIGINAL VISUAL FACTS)
         INPUT 2 (RAW SEO & LEGAL OUTPUT)
@@ -84,6 +90,11 @@ task_format_data = Task(
     LAW 3: THE ANTI-HALLUCINATION PURGE
     - Cross-check the RAW SEO keywords against the ORIGINAL VISUAL FACTS.
     - If the RAW SEO agent invented objects, actions, or concepts not supported by the visual facts (such as 'laptop', 'coffee', 'office', 'remote work setup', 'working from home' when there is only a balcony and a sunset), DELETE THEM IMMEDIATELY. Fake keywords lower the image's conversion rate and violate Shutterstock TOS.
+
+    LAW 4: THE KEYWORD COUNT RULE
+    - Final keywords list must contain 35-50 keywords.
+    - If the list is shorter, enrich it only with concepts directly supported by ORIGINAL VISUAL FACTS.
+    - Never add concepts that are not visible in the image.
 
     ---
     INPUT 1 (ORIGINAL VISUAL FACTS)
