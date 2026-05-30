@@ -16,8 +16,8 @@ Runs a batch pipeline over image files and outputs both CSV and TXT metadata sum
 
 Execution model:
 
-- all images are submitted in a single CrewAI batch invocation (`kickoff_for_each`)
-- results are then persisted per image into CSV/TXT outputs
+- images are processed sequentially one by one
+- results are flushed to disk immediately after each image is processed (to save memory and prevent data loss on crashes)
 
 Pipeline stages:
 
@@ -241,7 +241,7 @@ Benefits:
 
 - reusable across entrypoints or automation scripts
 - simpler `main.py`
-- one crew batch submission for all images in a folder (with serial fallback only if batch API fails)
+- immediate progressive saves to csv/txt protect against interruptions and reduce active memory loads
 
 ## How To Add a New Team
 

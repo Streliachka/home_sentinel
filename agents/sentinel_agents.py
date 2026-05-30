@@ -1,24 +1,9 @@
-import os
-from crewai import LLM, Agent
-from dotenv import load_dotenv
-from tools.tools import scan_network_logic, get_vendor_logic, flexible_nmap
+from crewai import Agent
+from tools.sentinel_tools import scan_network_logic, flexible_nmap
+from shared.llm_config import get_base_llms
 
-load_dotenv()
-
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
-VISION_MODEL = os.getenv("VISION_MODEL")
-LOCAL_MODEL = os.getenv("LOCAL_MODEL")
-
-LOCAL_MODEL_OBJ = LLM(
-    model=LOCAL_MODEL, 
-    base_url=OLLAMA_HOST,
-    temperature=0.2
-)
-
-# VISION_MODEL_OBJ = LLM(
-#     model=VISION_MODEL, 
-#     base_url=OLLAMA_HOST
-# )
+llms = get_base_llms()
+LOCAL_MODEL_OBJ = llms["LOCAL_MODEL_OBJ"]
 
 #----------------------------------------------------- Network Security Agents -----------------------------------------------------
 

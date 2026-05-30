@@ -43,7 +43,7 @@ def process_stock_folder(
     photo_info: str | None,
     delay_sec: float,
 ) -> None:
-    """Run metadata generation for all supported images in a folder and persist CSV/TXT outputs."""
+    """Run one CrewAI batch invocation for a folder and persist per-image CSV/TXT outputs."""
     folder = Path(folder_path)
     extensions = {".jpg", ".jpeg", ".png"}
 
@@ -78,33 +78,19 @@ def process_stock_folder(
         if not csv_exists:
             writer.writerow(csv_headers)
 
-        # Prepare all image inputs and submit them in one CrewAI batch invocation.
-        batch_inputs = [
-            {
+        for index, img_path in enumerate(image_files, start=1):
+            filename = img_path.name
+            print(f"\n[{index}/{len(image_files)}] Processing: {filename}...")
+
+            test_inputs = {
                 "image_path": str(img_path),
                 "OLLAMA_HOST": ollama_host,
                 "OLLAMA_MODEL": ollama_model,
                 "PHOTO_INFO": photo_info,
             }
-            for img_path in image_files
-        ]
-
-        batch_results = None
-        try:
-            print("Starting single batch crew run for all images...")
-            batch_results = selected_crew.kickoff_for_each(inputs=batch_inputs)
-        except Exception as batch_exc:
-            print(f"Batch kickoff_for_each failed, falling back to per-image kickoff: {batch_exc}")
-
-        for index, img_path in enumerate(image_files, start=1):
-            filename = img_path.name
-            print(f"\n[{index}/{len(image_files)}] Processing: {filename}...")
 
             try:
-                if batch_results is not None:
-                    result = batch_results[index - 1]
-                else:
-                    result = selected_crew.kickoff(inputs=batch_inputs[index - 1])
+                result = selected_crew.kickoff(inputs=test_inputs)
                 res_data = parse_crew_result(result)
 
                 final_title = f"TitleData: {res_data['title']}"
@@ -132,8 +118,8 @@ def process_stock_folder(
                 )
                 txt_file.flush()
 
-                # Delay is only meaningful for serial fallback mode.
-                if batch_results is None and delay_sec > 0:
+                # Keep optional delay between result writes for compatibility with existing CLI arg.
+                if delay_sec > 0:
                     time.sleep(delay_sec)
             except Exception as exc:
                 error_msg = str(exc)

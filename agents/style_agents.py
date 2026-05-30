@@ -1,64 +1,39 @@
 import os
 from crewai import LLM, Agent
-from dotenv import load_dotenv
+from shared.llm_config import get_base_llms
 
-load_dotenv()
-
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
-VISION_MODEL = os.getenv("VISION_MODEL")
-LOCAL_MODEL = os.getenv("LOCAL_MODEL")
-LOCAL_MODEL_PLUS = os.getenv("LOCAL_MODEL_PLUS")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
+llms = get_base_llms()
 
 def _build_style_agent_llm() -> LLM:
     provider = (os.getenv("STYLE_AGENT_PROVIDER") or "ollama").strip().lower()
     style_model = (os.getenv("STYLE_AGENT_MODEL") or "").strip()
 
     if provider == "gemini":
-        model_name = style_model or (GEMINI_MODEL or "").strip()
+        model_name = style_model or (os.getenv("GEMINI_MODEL") or "").strip()
         if not model_name:
             raise ValueError("STYLE_AGENT_MODEL or GEMINI_MODEL is required when STYLE_AGENT_PROVIDER=gemini")
-        if not GEMINI_API_KEY:
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
             raise ValueError("GEMINI_API_KEY is required when STYLE_AGENT_PROVIDER=gemini")
         return LLM(
             model=model_name,
             temperature=0.2,
-            api_key=GEMINI_API_KEY,
+            api_key=gemini_api_key,
         )
 
-    model_name = style_model or (LOCAL_MODEL or "").strip() or (LOCAL_MODEL_PLUS or "").strip() or (VISION_MODEL or "").strip()
+    model_name = style_model or (os.getenv("LOCAL_MODEL") or "").strip() or (os.getenv("LOCAL_MODEL_PLUS") or "").strip() or (os.getenv("VISION_MODEL") or "").strip()
     if not model_name:
         raise ValueError(
             "STYLE_AGENT_MODEL or LOCAL_MODEL or LOCAL_MODEL_PLUS or VISION_MODEL is required when STYLE_AGENT_PROVIDER=ollama"
         )
-    if not OLLAMA_HOST:
-        raise ValueError("OLLAMA_BASE_URL is required when STYLE_AGENT_PROVIDER=ollama")
+    ollama_host = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     return LLM(
         model=model_name,
-        base_url=OLLAMA_HOST,
+        base_url=ollama_host,
         temperature=0.2,
     )
 
 STYLE_AGENT_LLM = _build_style_agent_llm()
-
-# LOCAL_MODEL_PLUS_OBJ = LLM(
-#     model=LOCAL_MODEL_PLUS, 
-#     base_url=OLLAMA_HOST,
-#     temperature=0.2
-# )
-
-# VISION_MODEL_OBJ = LLM(
-#     model=VISION_MODEL, 
-#     base_url=OLLAMA_HOST
-# )
-
-# GEMINI = LLM(
-#     model=GEMINI_MODEL,
-#     temperature=0.0,
-#     api_key=GEMINI_API_KEY
-# )
 
 structure_scanner = Agent(
     role="File System Data Structure Specialist",

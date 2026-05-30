@@ -1,28 +1,28 @@
-Filename: chdvdji-2.jpg
-Description: Large green field with multiple rows of crops planted at regular intervals. Black line running horizontally across the center of the field. Two distinct sections of the field, one with more rows of crops and the other with less dense crops. Aerial view from above. Green field with brown or gray border around the field.
-Title: TitleData: Large green field with multiple rows of crops planted at regular intervals
-Keywords: KeywordsData: green;field;crops;rows;black line;horizontal;center;sections;density;aerial view
+Filename: chdvsn-20.jpg
+Description: Cityscape with tall grass field in the foreground, various-sized buildings with white, orange, and red colors, clear blue sky above.
+Title: TitleData: Urban Cityscape with Natural Landscape
+Keywords: KeywordsData: cityscape;tall grass;various-sized buildings;white buildings;orange buildings;red buildings;clear blue sky;bird's-eye view;natural landscape;urban environment;grass field;foreground;background;cityscape architecture;colorful buildings;cityscape photography;natural scenery;urban landscape
 Status: CLEANED_AND_APPROVED
 Modifications: None
 
-Filename: chdvdji-4.jpg
-Description: The main subject of the image is a field with a dirt road running through it. The left side of the field has trees and shrubs. The right side of the field has open space. There are two distinct sections of the field separated by the road. The sky above the field is a clear blue color. The field appears to be covered in lush green vegetation.
-Title: TitleData: Rural landscape with dirt road dividing a field
-Keywords: KeywordsData: dirt road;field;trees;shrubs;open space;clear sky;lush green
+Filename: fr-100.jpg
+Description: Sheep; Grass; Body of water (in the background)
+Title: TitleData: Rural landscape with sheep in a field by a body of water.
+Keywords: KeywordsData: sheep;grass;rural landscape;field;body of water;landscape photography;nature;pasture;farm;country;green;natural;serene;peaceful;calm;idyllic;scenic;view;horizon;low-angle
 Status: CLEANED_AND_APPROVED
 Modifications: None
 
-Filename: chdvdji_1.jpg
-Description: The main subject is an aerial view of a lush green field. The field has several smaller islands scattered throughout its expanse. A winding road runs through the middle of the field, leading towards one of the larger islands. There are trees on both sides of the island that the road leads to. The dominant colors in the image are shades of green and brown. No discernible texts or human-made objects are visible in the image.
-Title: TitleData: Aerial view of a lush green field with winding road through smaller islands
-Keywords: KeywordsData: aerial view;lush green field;winding road;smaller islands;trees;green;brown;nature;landscape
+Filename: fr-20.jpg
+Description: Two adjacent buildings are visible, one on the left and one on the right. The building on the left has multiple levels with windows and balconies. The building on the right has a flat roof and smaller windows. The facade of both buildings is gray. A person is walking on the sidewalk in front of one of the buildings. The street is visible, but no cars are present. There are trees or plants growing on either side of the street. The sky above is blue with a few white clouds.
+Title: TitleData: A person walks down a gray street lined with two adjacent buildings, one with multiple levels and balconies, the other with a flat roof.
+Keywords: KeywordsData: building;person;street;gray;facade;windows;balconies;flatroof;sidewalk;trees;plants;sky;clouds;blue;white;adjacent;levels;left;right
 Status: CLEANED_AND_APPROVED
 Modifications: None
 
-Filename: chdvsn-2.jpg
-Description: The image features power lines stretching across the frame. The sun is setting behind the power lines. Long shadows are cast by the power lines, adding depth to the scene. A tall smokestack stands out prominently in the background. The sky has a warm orange and pink hue due to sunset. There are text elements "TM" and "TM" visible in the image.
-Title: TitleData: Power lines at sunset with smokestack
-Keywords: KeywordsData: power lines;sunset;smokestack;long shadows;orange sky;pink hue
+Filename: fr-21.jpg
+Description: The image features two adjacent buildings. One building has a gray facade and black railings. The other building has a white facade with red accents. Both buildings have multiple windows that reflect the surrounding environment. The sky above appears to be overcast. There are no discernible texts in the image. The relative positions of the buildings suggest they are located side by side along the street.
+Title: TitleData: Two adjacent buildings with contrasting facades and reflective windows
+Keywords: KeywordsData: buildings;gray facade;black railings;white facade;red accents;multiple windows;overcast sky;side by side;street view;urban landscape;architecture;facade design;building styles;colorful accents;reflective surfaces;environmental context
 Status: CLEANED_AND_APPROVED
 Modifications: None
 

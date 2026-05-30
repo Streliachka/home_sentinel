@@ -1,44 +1,10 @@
-import os
-from crewai import LLM, Agent
-from dotenv import load_dotenv
+from crewai import Agent
+from shared.llm_config import get_base_llms
 
-load_dotenv()
-
-OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL")
-VISION_MODEL = os.getenv("VISION_MODEL")
-LOCAL_MODEL = os.getenv("LOCAL_MODEL")
-LOCAL_MODEL_PLUS = os.getenv("LOCAL_MODEL_PLUS")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL")
-
-LOCAL_MODEL_OBJ = LLM(
-    model=LOCAL_MODEL, 
-    base_url=OLLAMA_HOST,
-    temperature=0.2
-)
-
-LOCAL_MODEL_PLUS_OBJ = LLM(
-    model=LOCAL_MODEL_PLUS, 
-    base_url=OLLAMA_HOST,
-    temperature=0.2
-)
-
-VISION_MODEL_OBJ = LLM(
-    model=VISION_MODEL, 
-    base_url=OLLAMA_HOST
-)
-
-GEMINI = None
-if GEMINI_API_KEY and GEMINI_MODEL:
-    try:
-        GEMINI = LLM(
-            model=GEMINI_MODEL,
-            temperature=0.0,
-            api_key=GEMINI_API_KEY
-        )
-    except ImportError:
-        GEMINI = None
-
+llms = get_base_llms()
+LOCAL_MODEL_OBJ = llms["LOCAL_MODEL_OBJ"]
+LOCAL_MODEL_PLUS_OBJ = llms["LOCAL_MODEL_PLUS_OBJ"]
+GEMINI = llms["GEMINI"]
 
 #----------------------------------------------------- Metadata Agents -----------------------------------------------------
 
