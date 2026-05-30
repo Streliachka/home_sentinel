@@ -3,58 +3,69 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 
 from dotenv import load_dotenv
 
 from shared.functions.stock_metadata import process_stock_folder
 
 
-CREW_CHOICES = ["shutter_crew", "shutter_crew_gemini", "sentinel_crew", "style_crew"]
-
-COMMAND_ALIASES = {
-    "shutter": "metadata",
-}
-
-LEGACY_CREW_HINTS = {
-    "shutter_crew": "For shutter crews, use subcommand mode: python main.py shutter --crew <crew_name> --target-folder <path> (or python main.py metadata ...).",
-    "shutter_crew_gemini": "For shutter crews, use subcommand mode: python main.py shutter --crew <crew_name> --target-folder <path> (or python main.py metadata ...).",
-    "sentinel_crew": "Use: python main.py sentinel_crew --subnet <cidr>",
-    "style_crew": "Use: python main.py style_crew --root-directory <path>",
-}
+TOP_LEVEL_COMMANDS = {"metadata", "shutter", "sentinel_crew", "style_crew"}
+METADATA_CREW_CHOICES = ["shutter_crew", "shutter_crew_gemini"]
+CommandHandler = Callable[[argparse.Namespace], None]
 
 
-def _build_legacy_shutter_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run metadata/shutter flow in legacy mode.")
-    parser.add_argument("--crew", choices=["shutter_crew", "shutter_crew_gemini"], default="shutter_crew")
-    parser.add_argument("--target-folder", required=True, help="Folder with images to process.")
-    parser.add_argument("--output-file", default="./shutterstock_upload.csv", help="CSV output path.")
-    parser.add_argument(
-        "--ollama-host",
-        default=os.getenv("OLLAMA_BASE_URL"),
-        help="Ollama base URL. Defaults to OLLAMA_BASE_URL.",
-    )
-    parser.add_argument(
-        "--ollama-model",
-        default=os.getenv("VISION_MODEL"),
-        help="Vision model name. Defaults to VISION_MODEL.",
-    )
-    parser.add_argument(
-        "--photo-info",
-        default=os.getenv("PHOTO_INFO"),
-        help="Optional PHOTO_INFO metadata string.",
-    )
-    parser.add_argument("--delay-sec", type=float, default=4.0, help="Delay between images.")
-    return parser
+def _resolve_path(path_value: str) -> Path:
+    path = Path(path_value)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path
 
 
-def _add_shutter_like_parser(
+def _first_positional_token(argv: list[str]) -> tuple[int, str] | None:
+    for idx, token in enumerate(argv):
+        if not token.startswith("-"):
+            return idx, token
+    return None
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    """Normalizes top-level --crew invocations into the subcommand form."""
+    if "--crew" not in argv:
+        return argv
+
+    crew_index = argv.index("--crew")
+    if crew_index + 1 >= len(argv):
+        return argv
+
+    crew_value = argv[crew_index + 1]
+    before = argv[:crew_index]
+    after = argv[crew_index + 2 :]
+
+    # If a subcommand appears before --crew, keep argv unchanged.
+    first_positional = _first_positional_token(argv)
+    if first_positional is not None:
+        idx, token = first_positional
+        if idx < crew_index and token in TOP_LEVEL_COMMANDS:
+            return argv
+
+    if crew_value in METADATA_CREW_CHOICES:
+        return [*before, "metadata", "--crew", crew_value, *after]
+
+    if crew_value in TOP_LEVEL_COMMANDS:
+        return [*before, crew_value, *after]
+
+    return argv
+
+
+def _add_metadata_parser(
     subparsers: argparse._SubParsersAction,
     command_name: str,
     help_text: str,
     aliases: list[str] | None = None,
 ) -> None:
     parser = subparsers.add_parser(command_name, help=help_text, aliases=aliases or [])
-    parser.add_argument("--crew", choices=["shutter_crew", "shutter_crew_gemini"], default="shutter_crew")
+    parser.add_argument("--crew", choices=METADATA_CREW_CHOICES, default="shutter_crew")
     parser.add_argument("--target-folder", required=True, help="Folder with images to process.")
     parser.add_argument("--output-file", default="./shutterstock_upload.csv", help="CSV output path.")
     parser.add_argument(
@@ -75,7 +86,22 @@ def _add_shutter_like_parser(
     parser.add_argument("--delay-sec", type=float, default=4.0, help="Delay between images.")
 
 
-def _handle_metadata_like_command(args: argparse.Namespace) -> None:
+def _add_sentinel_parser(subparsers: argparse._SubParsersAction) -> None:
+    sentinel_parser = subparsers.add_parser("sentinel_crew", help="Run sentinel crew.")
+    sentinel_parser.add_argument("--subnet", required=True, help="Subnet/CIDR, e.g. 192.168.1.0/24")
+
+
+def _add_style_parser(subparsers: argparse._SubParsersAction) -> None:
+    style_parser = subparsers.add_parser("style_crew", help="Run style crew.")
+    style_parser.add_argument("--root-directory", required=True, help="Root folder for style processing.")
+    style_parser.add_argument(
+        "--style-data-dir",
+        default="./styleData",
+        help="Workspace folder used by style_crew for intermediate and final artifacts.",
+    )
+
+
+def _handle_metadata_command(args: argparse.Namespace) -> None:
     from crew.metadata_crew import shutter_crew, shutter_crew_gemini
 
     if not args.ollama_host:
@@ -109,11 +135,19 @@ def _handle_sentinel_command(args: argparse.Namespace) -> None:
 
 
 def _handle_style_command(args: argparse.Namespace) -> None:
-    from crew.style_crew import photo_analysis_crew, style_report_task, style_final_guide_task
+    root_path = _resolve_path(args.root_directory)
 
-    style_data_path = Path(args.style_data_dir)
-    if not style_data_path.is_absolute():
-        style_data_path = Path.cwd() / style_data_path
+    if not root_path.exists() or not root_path.is_dir():
+        print(f"Style crew skipped: root directory not found or is not a directory: {root_path}")
+        return
+
+    try:
+        from crew.style_crew import photo_analysis_crew, style_report_task, style_final_guide_task
+    except Exception as exc:
+        print(f"Style crew initialization failed: {exc}")
+        return
+
+    style_data_path = _resolve_path(args.style_data_dir)
     style_data_path.mkdir(parents=True, exist_ok=True)
 
     # Keep task output files aligned with the runtime workspace selected via --style-data-dir.
@@ -121,63 +155,49 @@ def _handle_style_command(args: argparse.Namespace) -> None:
     style_final_guide_task.output_file = str(style_data_path / "FINAL_PRO_PRODUCTION_GUIDE.md")
 
     print("Starting crew: style_crew")
-    result = photo_analysis_crew.kickoff(
-        inputs={
-            "root_directory": args.root_directory,
-            "style_data_dir": str(style_data_path),
-        }
-    )
+    try:
+        result = photo_analysis_crew.kickoff(
+            inputs={
+                "root_directory": str(root_path),
+                "style_data_dir": str(style_data_path),
+            }
+        )
+    except Exception as exc:
+        print(f"Style crew execution failed: {exc}")
+        return
+
     print("\nCrew Result:\n")
     print(result)
 
 
-COMMAND_HANDLERS = {
-    "metadata": _handle_metadata_like_command,
-    "sentinel_crew": _handle_sentinel_command,
-    "style_crew": _handle_style_command,
-}
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run one of the available crews.")
-    parser.add_argument(
-        "--crew",
-        choices=CREW_CHOICES,
-        help="Legacy mode without subcommands. Use subcommands for cleaner help.",
-    )
-
-    subparsers = parser.add_subparsers(dest="command")
-
-    _add_shutter_like_parser(
+def _register_commands(subparsers: argparse._SubParsersAction) -> dict[str, CommandHandler]:
+    _add_metadata_parser(
         subparsers,
         "metadata",
         "Run metadata/shutter flow in folder batch mode.",
         aliases=["shutter"],
     )
+    _add_sentinel_parser(subparsers)
+    _add_style_parser(subparsers)
 
-    sentinel_parser = subparsers.add_parser("sentinel_crew", help="Run sentinel crew.")
-    sentinel_parser.add_argument("--subnet", required=True, help="Subnet/CIDR, e.g. 192.168.1.0/24")
-
-    style_parser = subparsers.add_parser("style_crew", help="Run style crew.")
-    style_parser.add_argument("--root-directory", required=True, help="Root folder for style processing.")
-    style_parser.add_argument(
-        "--style-data-dir",
-        default="./styleData",
-        help="Workspace folder used by style_crew for intermediate and final artifacts.",
-    )
-
-    return parser
+    return {
+        "metadata": _handle_metadata_command,
+        "sentinel_crew": _handle_sentinel_command,
+        "style_crew": _handle_style_command,
+    }
 
 
-def run_legacy_mode(args: argparse.Namespace):
-    if args.crew in LEGACY_CREW_HINTS:
-        raise ValueError(LEGACY_CREW_HINTS[args.crew])
-    raise ValueError("Unknown crew mode")
+def build_parser() -> tuple[argparse.ArgumentParser, dict[str, CommandHandler]]:
+    parser = argparse.ArgumentParser(description="Run one of the available crews.")
+
+    subparsers = parser.add_subparsers(dest="command")
+    command_handlers = _register_commands(subparsers)
+
+    return parser, command_handlers
 
 
-def run_subcommand_mode(args: argparse.Namespace):
-    normalized_command = COMMAND_ALIASES.get(args.command, args.command)
-    handler = COMMAND_HANDLERS.get(normalized_command)
+def _run_command(args: argparse.Namespace, command_handlers: dict[str, CommandHandler]) -> None:
+    handler = command_handlers.get(args.command)
     if handler is None:
         raise ValueError("Unknown subcommand")
     handler(args)
@@ -186,24 +206,11 @@ def run_subcommand_mode(args: argparse.Namespace):
 def main() -> None:
     load_dotenv()
 
-    legacy_argv = sys.argv[1:]
-    if "--crew" in legacy_argv:
-        crew_index = legacy_argv.index("--crew")
-        if crew_index + 1 < len(legacy_argv) and legacy_argv[crew_index + 1] in {"shutter_crew", "shutter_crew_gemini"}:
-            legacy_parser = _build_legacy_shutter_parser()
-            legacy_args = legacy_parser.parse_args(legacy_argv)
-            _handle_metadata_like_command(legacy_args)
-            return
-
-    parser = build_parser()
-    args = parser.parse_args()
+    parser, command_handlers = build_parser()
+    args = parser.parse_args(_normalize_argv(sys.argv[1:]))
 
     if args.command:
-        run_subcommand_mode(args)
-        return
-
-    if args.crew:
-        run_legacy_mode(args)
+        _run_command(args, command_handlers)
         return
 
     parser.print_help()

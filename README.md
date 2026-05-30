@@ -74,6 +74,123 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+## Developer Onboarding
+
+Use this section when you just cloned/downloaded the repository.
+
+### 1) Install system prerequisites
+
+- Python 3.10+ (3.11 recommended)
+- Git
+- Nmap (required for `sentinel_crew` scans)
+- Ollama (required for local model flows)
+
+Examples:
+
+- Windows:
+  - install Python from python.org
+  - install Nmap from nmap.org (ensure `nmap` is available in PATH)
+  - install Ollama from ollama.com
+- macOS (Homebrew):
+  - `brew install python nmap`
+  - install Ollama from ollama.com
+- Ubuntu/Debian:
+  - `sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip nmap`
+  - install Ollama from ollama.com
+
+### 2) Clone and enter the project
+
+```bash
+git clone <your-fork-or-repo-url>
+cd home_sentinel
+```
+
+### 3) Create and activate a virtual environment
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 4) Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 5) Start Ollama and pull required models
+
+Run Ollama in the background, then pull at least one vision model and one text model:
+
+```bash
+ollama pull llava
+ollama pull llama3
+```
+
+### 6) Create `.env` in project root
+
+Copy the template and then edit values for your machine:
+
+```bash
+cp .env.example .env
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Template includes:
+
+- core Ollama variables
+- optional Gemini variables (commented)
+- optional style routing variables
+
+### 7) Verify installation
+
+Check CLI help:
+
+```bash
+python main.py --help
+```
+
+Quick metadata smoke test:
+
+```bash
+python main.py metadata --target-folder ./tmp_empty_shutter
+```
+
+Quick style smoke test:
+
+```bash
+python main.py style_crew --root-directory . --style-data-dir ./styleData
+```
+
+Quick sentinel smoke test:
+
+```bash
+python main.py sentinel_crew --subnet 127.0.0.1/32
+```
+
+### 8) Common first-run issues
+
+- `nmap` command not found:
+  - install Nmap and ensure it is in PATH
+- connection errors to Ollama:
+  - start Ollama and confirm `OLLAMA_BASE_URL`
+- missing model errors:
+  - pull models with `ollama pull ...` and match names in `.env`
+
 ## Environment Configuration
 
 Create a `.env` file in project root.
@@ -124,13 +241,13 @@ python main.py --help
 python main.py metadata --target-folder ./images
 ```
 
-Legacy alias:
+Alias:
 
 ```bash
 python main.py shutter --target-folder ./images
 ```
 
-Legacy crew mode with explicit crew selection:
+Compatibility form with explicit crew selection:
 
 ```bash
 python main.py --crew shutter_crew_gemini --target-folder ./images
@@ -227,11 +344,11 @@ Benefits:
 - adding a new team does not require growing `if/elif` chains
 - each command flow is isolated and easier to test
 
-Legacy compatibility:
+CLI compatibility and normalization:
 
 - `metadata` is the canonical command
 - `shutter` is a CLI alias for `metadata`
-- `--crew shutter_crew` and `--crew shutter_crew_gemini` are still supported through a dedicated legacy parser path for backward compatibility
+- top-level `--crew ...` invocations are normalized to subcommands so all execution follows one command path
 
 ### Shared metadata pipeline
 
@@ -301,7 +418,7 @@ A `Dockerfile` exists in root. If you run in containers, ensure `.env` values ar
 
 Recent cleanup includes:
 
-- removed dead legacy modules:
+- removed unused modules:
   - `style_agents.py` (root)
   - `agents/agents.py`
   - `tasks/tasks.py`
@@ -309,4 +426,5 @@ Recent cleanup includes:
 - converted remaining Russian comments/docstrings to English
 - enforced configurable model routing for style team (Ollama/Gemini)
 - added generated artifact ignore rules
+- unified CLI execution path in `main.py`
 
