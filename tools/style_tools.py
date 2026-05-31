@@ -34,10 +34,10 @@ def _build_style_llm_client():
         return client, model_name, provider
 
     # Default provider: Ollama
-    model_name = style_model or local_model or vision_model
+    model_name = vision_model or style_model or local_model
     if not model_name:
         raise ValueError(
-            "STYLE_LLM_MODEL or LOCAL_MODEL or VISION_MODEL is required when STYLE_LLM_PROVIDER=ollama"
+            "VISION_MODEL or STYLE_LLM_MODEL or LOCAL_MODEL is required when STYLE_LLM_PROVIDER=ollama"
         )
 
     # Accept values like "ollama/llama3.2:3b" in env vars and normalize for Ollama API.

@@ -1,4 +1,5 @@
 import base64
+import os
 from pathlib import Path
 
 import requests
@@ -12,6 +13,13 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
     Accepts optional PHOTO_INFO string containing extra metadata for matching files.
     """
     try:
+        # Always use VISION_MODEL for image analysis regardless of passed OLLAMA_MODEL.
+        resolved_model = (os.getenv("VISION_MODEL") or "").strip()
+        if not resolved_model:
+            return "VISION_MODEL is not configured in environment."
+        if resolved_model.startswith("ollama/"):
+            resolved_model = resolved_model.split("/", 1)[1].strip()
+
         current_filename = Path(image_path).stem
         additional_context = ""
 
@@ -33,7 +41,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             img_str = base64.b64encode(f.read()).decode("utf-8")
 
         warmup_payload = {
-            "model": OLLAMA_MODEL,
+            "model": resolved_model,
             "prompt": "ping",
             "stream": False,
             "options": {"num_predict": 1},
@@ -44,7 +52,7 @@ def analyze_image_via_ollama(image_path: str, OLLAMA_HOST: str, OLLAMA_MODEL: st
             return f"Error loading model in Ollama: {warmup_response.text}"
 
         payload = {
-            "model": OLLAMA_MODEL,
+            "model": resolved_model,
             "prompt": base_prompt,
             "stream": False,
             "images": [img_str],

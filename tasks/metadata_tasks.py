@@ -3,7 +3,8 @@ from crewai import Task
 
 task_analyze_image = Task(
     description='''Analyze the image at path:{image_path}. 
-        You MUST call tool analyze_image_via_ollama exactly once with {image_path}, {OLLAMA_HOST}, {OLLAMA_MODEL} and {PHOTO_INFO} . 
+        You MUST call tool analyze_image_via_ollama exactly once with {image_path}, {OLLAMA_HOST}, {OLLAMA_MODEL} and {PHOTO_INFO}. 
+        The analysis model is always VISION_MODEL from environment; OLLAMA_MODEL input must not change image-analysis model selection.
         Do not output tool-call JSON in the final answer. 
         After the tool returns, identify main subject, secondary objects, shot angle, and environment.
        ''',
