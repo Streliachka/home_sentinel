@@ -14,7 +14,8 @@ style_scan = Task(
 style_analyze = Task(
     description='''Find all '*_profile.json' files in '{style_data_dir}'. 
                     For each file, run a deep photo analysis tool to extract EXIF data, 
-                    analyze black color handling, contrast, minimalism and geometry in the Trashhand/FineArt style. 
+                    analyze black color handling, contrast, minimalism and geometry in the Trashhand/FineArt style.
+                    Include dominant colors as HEX values with approximate share and classify likely Itten color-wheel harmony. 
                     Rewrite these files by adding the extracted insights and an author-level style summary.
                     The summary must be saved in field 'author_style_profile' and must describe:
                     - artistic philosophy,
@@ -32,11 +33,17 @@ style_report = Task(
                     Conduct comparative analysis. 
                     Create a single report '{style_data_dir}/comprehensive_style_report.json'. 
                     Within the report, group data by patterns: whose shadows are matte, whose are crushed, which HEX palettes dominate, who exhibits minimalism and geometry.
+                                        Add a cross-author color analytics section with:
+                                        - recurring dominant HEX colors ranked by frequency,
+                                        - recurring palette clusters (warm/cool/neutral families),
+                                        - Itten color-wheel harmony frequencies across all analyzed photos
+                                            (monochromatic, analogous, complementary, split complementary, triadic, tetradic, and contrast-based patterns),
+                                        - per-author preferred harmony profile and notable deviations.
                     Also include a dedicated per-author section that summarizes each author's philosophy and intentions
                     (sourced from 'author_style_profile') and a cross-author comparison of these intentions.
                     You MUST call tool read_profile_files_tool exactly once with {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
-    expected_output="File 'comprehensive_style_report.json' containing common visual/technical patterns plus per-author philosophy and intention summaries.",
+        expected_output="File 'comprehensive_style_report.json' containing common visual/technical patterns, aggregated HEX and Itten harmony statistics, plus per-author philosophy and intention summaries.",
     #agent=data_synthesizer,
     output_file="styleData/comprehensive_style_report.json"
 )

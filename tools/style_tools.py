@@ -303,8 +303,23 @@ def analyze_photos_in_folder(author_json_path: str = "", object: str = "") -> st
             2. Tonal and color minimalism (degree of desaturation of parasitic colors, dominant HEX tones, presence of selective accent color).
             3. Fine art composition markers (presence of geometry, leading lines, percentage of frame filled with negative space, scale of silhouette/subject).
             4. Texture and sharpness usage (microcontrast curve, presence of film grain or razor sharpness on contours).
+            5. Extract dominant colors as a list with hex codes and estimated percentage share of frame.
+            6. Classify the most likely color harmony using Itten color-wheel logic.
 
-            Return the response strictly in short JSON format with keys: "filename", "exif", "shadow_analysis", "color_analysis", "composition_analysis", "texture_analysis".
+            Return the response strictly in short JSON format with keys:
+            - "filename"
+            - "exif"
+            - "shadow_analysis"
+            - "color_analysis"
+            - "composition_analysis"
+            - "texture_analysis"
+            - "dominant_colors" (array of objects: {{"name": "...", "hex": "#RRGGBB", "approx_share_percent": number}})
+            - "itten_color_scheme" (object with: {{"scheme": "monochromatic|analogous|complementary|split_complementary|triadic|tetradic|warm_cool_contrast|light_dark_contrast|saturation_contrast|extension_contrast", "confidence": "low|medium|high", "justification": "..."}})
+
+            Rules:
+            - Use valid 6-digit HEX values.
+            - dominant_colors should contain 3 to 7 items ordered by prevalence.
+            - approx_share_percent values should approximately sum to 100.
             """
 
             try:
