@@ -2,21 +2,38 @@ import base64
 import ipaddress
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import requests
 from crewai.tools import tool
 from typing import List
 
-#nmap_path = r"C:\Program Files (x86)\Nmap\nmap.exe"
-nmap_path = "nmap"
+
+def _resolve_nmap_path() -> str | None:
+    from_path = shutil.which("nmap")
+    if from_path:
+        return from_path
+
+    windows_candidates = [
+        Path("C:/Program Files/Nmap/nmap.exe"),
+        Path("C:/Program Files (x86)/Nmap/nmap.exe"),
+    ]
+    for candidate in windows_candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return None
 
 @tool("scan_local_network")
 def scan_network_logic(ip_range: str):
     """
     Scans the network and returns a CLEAN list of IPs, Hostnames, and Ports.
     """
+    nmap_path = _resolve_nmap_path()
+    if nmap_path is None:
+        return "NMAP_MISSING: Install Nmap and ensure 'nmap' is in PATH."
+
     try:
-        #result = subprocess.check_output([nmap_path, "-sn", ip_range], text=True)
         result = subprocess.check_output([nmap_path, "-sn", ip_range], text=True)
         return result
     except Exception as e:
@@ -49,6 +66,9 @@ def flexible_nmap(subnet: str, options: str = "-F"):
     Example:
         options="-Pn --top-ports 100"
     """
+    nmap_path = _resolve_nmap_path()
+    if nmap_path is None:
+        return "NMAP_MISSING: Install Nmap and ensure 'nmap' is in PATH."
 
     # -----------------------------
     # 1. Validate subnet strictly

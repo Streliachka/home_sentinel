@@ -1,6 +1,7 @@
 
 import argparse
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Callable
@@ -128,6 +129,13 @@ def _handle_metadata_command(args: argparse.Namespace) -> None:
 def _handle_sentinel_command(args: argparse.Namespace) -> None:
     from crew.sentinel_crew import sentinel_crew
 
+    if shutil.which("nmap") is None:
+        print(
+            "sentinel_crew skipped: nmap executable was not found in PATH. "
+            "Install Nmap and ensure 'nmap' is available in your shell PATH."
+        )
+        return
+
     print("Starting crew: sentinel_crew")
     result = sentinel_crew.kickoff(inputs={"subnet": args.subnet})
     print("\nCrew Result:\n")
@@ -137,7 +145,14 @@ def _handle_sentinel_command(args: argparse.Namespace) -> None:
 def _handle_style_command(args: argparse.Namespace) -> None:
     root_path = _resolve_path(args.root_directory)
 
-    if not root_path.exists() or not root_path.is_dir():
+    try:
+        root_exists = root_path.exists()
+        root_is_dir = root_path.is_dir()
+    except OSError as exc:
+        print(f"Style crew skipped: unable to access root directory '{root_path}': {exc}")
+        return
+
+    if not root_exists or not root_is_dir:
         print(f"Style crew skipped: root directory not found or is not a directory: {root_path}")
         return
 

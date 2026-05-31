@@ -38,6 +38,12 @@ Analyzes author photo folders and produces:
 2. A consolidated style report JSON
 3. A final production guide in Markdown
 
+Each author profile now includes an `author_style_profile` section describing:
+
+- artistic philosophy
+- likely intentions and narrative direction
+- emotional tone and visual signature choices
+
 All style artifacts are generated in a configurable workspace (`--style-data-dir`).
 
 ### 3) Sentinel Team (`sentinel_crew`)
@@ -66,6 +72,7 @@ Important files:
 
 - Python 3.10+
 - Ollama running and reachable (for local models/tools)
+- Nmap installed and reachable in PATH (required for real `sentinel_crew` scans)
 - Optional Gemini API key for Gemini-based flows
 
 Install dependencies:
@@ -265,6 +272,8 @@ python main.py style_crew --root-directory ./authors --style-data-dir ./styleDat
 python main.py sentinel_crew --subnet 192.168.1.0/24
 ```
 
+If `nmap` is missing, the command exits early with a clear prerequisite message instead of producing synthetic scan data.
+
 ## Supported Inputs and Outputs
 
 ### Metadata team
@@ -296,6 +305,8 @@ Output artifacts in selected style workspace:
 - `*_profile.json`
 - `comprehensive_style_report.json`
 - `FINAL_PRO_PRODUCTION_GUIDE.md`
+
+Per-author profiles additionally contain `author_style_profile` for philosophy/intent synthesis.
 
 ## Architecture Notes
 
@@ -337,12 +348,13 @@ flowchart TD
 
 ### Command dispatch design
 
-`main.py` uses a command handler registry (`COMMAND_HANDLERS`) to map subcommands to dedicated handler functions.
+`main.py` uses a command registration function (`_register_commands`) to build subparsers and map subcommands to dedicated handlers.
 
 Benefits:
 
 - adding a new team does not require growing `if/elif` chains
 - each command flow is isolated and easier to test
+- parser setup and handler wiring are maintained in one place
 
 CLI compatibility and normalization:
 
@@ -369,7 +381,7 @@ Use this checklist:
 3. Compose crew in `crew/<team>_crew.py`
 4. Add CLI parser block in `build_parser()`
 5. Add handler function in `main.py`
-6. Register handler in `COMMAND_HANDLERS`
+6. Register parser + handler wiring in `_register_commands`
 7. Add any team-specific tools in `tools/<team>_tools.py`
 8. Update this README with examples
 
@@ -377,7 +389,7 @@ Minimal command registration pattern in `main.py`:
 
 - parser entry for the subcommand
 - `_handle_<team>_command(args)` implementation
-- `COMMAND_HANDLERS["<team>"] = _handle_<team>_command`
+- `_register_commands` returns mapping: `"<team>": _handle_<team>_command`
 
 ## Operational Conventions
 
@@ -410,6 +422,25 @@ Check style provider variables:
 - `STYLE_LLM_PROVIDER`
 - `STYLE_LLM_MODEL` (or provider fallback models)
 
+### `author_style_profile` is `unavailable`
+
+This means photo-level analysis failed for the author (for example model resolution errors or API failures). Check:
+
+- Ollama availability and `OLLAMA_BASE_URL`
+- model names configured via `STYLE_LLM_MODEL`, `LOCAL_MODEL`, and `VISION_MODEL`
+- that the target author folder contains supported images (`.jpg`, `.jpeg`, `.png`)
+
+The profile file is still written with a diagnostic reason to keep the pipeline deterministic.
+
+### `sentinel_crew skipped: nmap executable was not found in PATH`
+
+Install Nmap and make sure `nmap` is available in your shell PATH.
+
+On Windows, the code also checks common default install paths:
+
+- `C:/Program Files/Nmap/nmap.exe`
+- `C:/Program Files (x86)/Nmap/nmap.exe`
+
 ## Docker
 
 A `Dockerfile` exists in root. If you run in containers, ensure `.env` values are injected at runtime and Ollama/Gemini endpoints are reachable from the container network.
@@ -425,6 +456,9 @@ Recent cleanup includes:
 - centralized metadata batch logic in shared module
 - converted remaining Russian comments/docstrings to English
 - enforced configurable model routing for style team (Ollama/Gemini)
+- normalized model-name handling across shared/style LLM clients
 - added generated artifact ignore rules
 - unified CLI execution path in `main.py`
+- hardened style path validation for inaccessible/locked drives
+- added deterministic sentinel preflight checks for missing `nmap`
 

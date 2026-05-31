@@ -39,6 +39,11 @@ def _build_style_llm_client():
         raise ValueError(
             "STYLE_LLM_MODEL or LOCAL_MODEL or VISION_MODEL is required when STYLE_LLM_PROVIDER=ollama"
         )
+
+    # Accept values like "ollama/llama3.2:3b" in env vars and normalize for Ollama API.
+    if model_name.startswith("ollama/"):
+        model_name = model_name.split("/", 1)[1].strip()
+
     if not ollama_host:
         raise ValueError("OLLAMA_BASE_URL is required when STYLE_LLM_PROVIDER=ollama")
 
@@ -55,6 +60,38 @@ def _resolve_style_data_dir(style_data_dir: str) -> Path:
         path = Path.cwd() / path
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _normalize_tool_value(raw_value: str | None) -> str:
+    """Normalize tool-call wrapper payloads like {'value': '...'} or [{'value': '...'}]."""
+    if raw_value is None:
+        return ""
+
+    value = str(raw_value).strip()
+    if not value:
+        return ""
+
+    if value.startswith("{") and value.endswith("}"):
+        try:
+            maybe_dict = ast.literal_eval(value)
+            if isinstance(maybe_dict, dict) and "value" in maybe_dict:
+                return str(maybe_dict["value"]).strip()
+        except Exception:
+            return value
+
+    if value.startswith("[") and value.endswith("]"):
+        try:
+            maybe_list = ast.literal_eval(value)
+            if isinstance(maybe_list, list) and maybe_list:
+                first = maybe_list[0]
+                if isinstance(first, dict) and "value" in first:
+                    return str(first["value"]).strip()
+                if isinstance(first, str):
+                    return first.strip()
+        except Exception:
+            return value
+
+    return value
 
 
 def _resolve_profile_workspace(candidate_path: str | None) -> Path:
@@ -144,7 +181,8 @@ def scan_root_structure(root_directory: str, style_data_dir: str = "styleData") 
 @tool("Read Profile Files Tool")
 def read_profile_files(style_data_dir: str = "styleData") -> str:
     """Reads all *_profile.json files from styleData workspace and returns combined JSON content for analysis."""
-    root = _resolve_profile_workspace(style_data_dir)
+    normalized_dir = _normalize_tool_value(style_data_dir)
+    root = _resolve_profile_workspace(normalized_dir)
     profile_files = sorted(root.glob("*_profile.json"))
     if not profile_files:
         return f"No *_profile.json files found in {root.resolve()}."
@@ -167,21 +205,64 @@ def read_profile_files(style_data_dir: str = "styleData") -> str:
 @tool("Deep Photo Analyzer Tool")
 def analyze_photos_in_folder(author_json_path: str = "", object: str = "") -> str:
     """Analyzes one or many *_profile.json files and enriches each profile with photo analysis data."""
-    def _normalize_input_path(raw_value: str) -> str:
-        """Handle malformed values like "{'type': 'string', 'value': './'}" produced by some tool calls."""
-        value = str(raw_value).strip()
-        if not value:
-            return ""
-        if value.startswith("{") and value.endswith("}"):
-            try:
-                maybe_dict = ast.literal_eval(value)
-                if isinstance(maybe_dict, dict) and "value" in maybe_dict:
-                    return str(maybe_dict["value"]).strip()
-            except Exception:
-                return value
-        return value
 
     def _analyze_single_profile(profile_path: Path, client, model_name: str, provider_name: str) -> dict:
+        def _build_author_style_profile(analyzed_photos: list[dict]) -> dict:
+            valid_items = [item for item in analyzed_photos if isinstance(item, dict) and not item.get("error")]
+            if not valid_items:
+                return {
+                    "status": "unavailable",
+                    "reason": "No successful photo analyses available for synthesis.",
+                }
+
+            prompt = f"""
+            You are given structured photo-analysis notes for a single author.
+            Build a concise but detailed author-level style synthesis as JSON.
+
+            Source analysis:
+            {json.dumps(valid_items, ensure_ascii=False)}
+
+            Return strict JSON with keys:
+            - style_identity
+            - philosophy
+            - intentions
+            - emotional_tone
+            - composition_strategy
+            - light_and_shadow_logic
+            - color_intent
+            - post_processing_signature
+            - viewer_impact
+            - confidence
+
+            Rules:
+            - Keep each field as a short paragraph (2-4 sentences).
+            - Base claims only on provided analysis.
+            - If uncertain, state assumptions explicitly inside the field text.
+            - confidence must be one of: low, medium, high.
+            """
+
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You synthesize author style philosophy and artistic intent from technical and visual evidence.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                profile = json.loads(response.choices[0].message.content)
+                profile["photos_used"] = len(valid_items)
+                return profile
+            except Exception as exc:
+                return {
+                    "status": "unavailable",
+                    "reason": f"Author style synthesis failed: {str(exc)}",
+                    "photos_used": len(valid_items),
+                }
+
         with open(profile_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
@@ -243,6 +324,7 @@ def analyze_photos_in_folder(author_json_path: str = "", object: str = "") -> st
                 analyzed_list.append({"filename": p.name, "error": str(exc)})
 
         data["analyzed_photos"] = analyzed_list
+        data["author_style_profile"] = _build_author_style_profile(analyzed_list)
         with open(profile_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
@@ -258,7 +340,7 @@ def analyze_photos_in_folder(author_json_path: str = "", object: str = "") -> st
         return f"Style analyzer configuration error: {str(exc)}"
 
     if not author_json_path and object:
-        parsed_object = _normalize_input_path(object)
+        parsed_object = _normalize_tool_value(object)
         if parsed_object.startswith("{") and parsed_object.endswith("}"):
             try:
                 object_dict = ast.literal_eval(parsed_object)
@@ -269,7 +351,7 @@ def analyze_photos_in_folder(author_json_path: str = "", object: str = "") -> st
         else:
             author_json_path = parsed_object
 
-    normalized_path = _normalize_input_path(author_json_path)
+    normalized_path = _normalize_tool_value(author_json_path)
     path_obj = _resolve_profile_workspace(normalized_path)
 
     if path_obj and path_obj.is_file() and path_obj.suffix.lower() == ".json":

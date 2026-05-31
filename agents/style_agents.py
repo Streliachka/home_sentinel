@@ -26,6 +26,8 @@ def _build_style_agent_llm() -> LLM:
         raise ValueError(
             "STYLE_AGENT_MODEL or LOCAL_MODEL or LOCAL_MODEL_PLUS or VISION_MODEL is required when STYLE_AGENT_PROVIDER=ollama"
         )
+    if "/" not in model_name:
+        model_name = f"ollama/{model_name}"
     ollama_host = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     return LLM(
         model=model_name,

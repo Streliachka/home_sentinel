@@ -1,15 +1,25 @@
 import os
 from crewai import LLM
 
+
+def _normalize_crewai_ollama_model(model_name: str) -> str:
+    """CrewAI Ollama models should use 'ollama/<model>' format."""
+    clean_name = (model_name or "").strip()
+    if not clean_name:
+        return clean_name
+    if "/" in clean_name:
+        return clean_name
+    return f"ollama/{clean_name}"
+
 def get_base_llms():
     """
     Centralized connection factory for models used across teams.
     Ensures identical initialization configurations.
     """
     OLLAMA_HOST = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3")
-    LOCAL_MODEL_PLUS = os.getenv("LOCAL_MODEL_PLUS", "llama3")
-    VISION_MODEL = os.getenv("VISION_MODEL", "llava")
+    LOCAL_MODEL = _normalize_crewai_ollama_model(os.getenv("LOCAL_MODEL", "llama3"))
+    LOCAL_MODEL_PLUS = _normalize_crewai_ollama_model(os.getenv("LOCAL_MODEL_PLUS", "llama3"))
+    VISION_MODEL = _normalize_crewai_ollama_model(os.getenv("VISION_MODEL", "llava"))
 
     # Shared Ollama instances
     local_model_obj = LLM(

@@ -15,10 +15,15 @@ style_analyze = Task(
     description='''Find all '*_profile.json' files in '{style_data_dir}'. 
                     For each file, run a deep photo analysis tool to extract EXIF data, 
                     analyze black color handling, contrast, minimalism and geometry in the Trashhand/FineArt style. 
-                    Rewrite these files by adding the extracted insights.
+                    Rewrite these files by adding the extracted insights and an author-level style summary.
+                    The summary must be saved in field 'author_style_profile' and must describe:
+                    - artistic philosophy,
+                    - likely author intentions,
+                    - emotional and narrative direction,
+                    - stylistic signature decisions (composition, light, color, processing).
                     You MUST call tool deep_photo_analyzer_tool exactly once with {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
-    expected_output="Updated author profile files containing deep technical and visual analysis of their photos.",
+    expected_output="Updated author profile files containing deep technical/visual analysis and a detailed 'author_style_profile' section with philosophy and intentions.",
     #agent=photo_analyser
 )
 
@@ -27,9 +32,11 @@ style_report = Task(
                     Conduct comparative analysis. 
                     Create a single report '{style_data_dir}/comprehensive_style_report.json'. 
                     Within the report, group data by patterns: whose shadows are matte, whose are crushed, which HEX palettes dominate, who exhibits minimalism and geometry.
+                    Also include a dedicated per-author section that summarizes each author's philosophy and intentions
+                    (sourced from 'author_style_profile') and a cross-author comparison of these intentions.
                     You MUST call tool read_profile_files_tool exactly once with {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
-    expected_output="File 'comprehensive_style_report.json' containing a structured tree of common visual and technical features of studied works.",
+    expected_output="File 'comprehensive_style_report.json' containing common visual/technical patterns plus per-author philosophy and intention summaries.",
     #agent=data_synthesizer,
     output_file="styleData/comprehensive_style_report.json"
 )
