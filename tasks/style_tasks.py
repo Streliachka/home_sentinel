@@ -5,7 +5,7 @@ style_scan = Task(
                     Based on the names of these folders, 
                     create individual files of the form 'AUTHOR_NAME_profile.json' inside '{style_data_dir}'.
                     Create '{style_data_dir}' if it does not exist.
-                    You MUST call tool structure_scanning_tool exactly once with {root_directory} and {style_data_dir}.
+                    You MUST call tool scan_root_structure exactly once with {root_directory} and {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
     expected_output="List of created JSON files for each detected author in the selected style_data_dir workspace.",
     #agent=structure_scanner
@@ -22,7 +22,7 @@ style_analyze = Task(
                     - likely author intentions,
                     - emotional and narrative direction,
                     - stylistic signature decisions (composition, light, color, processing).
-                    You MUST call tool deep_photo_analyzer_tool exactly once with {style_data_dir}.
+                    You MUST call tool analyze_photos_in_folder exactly once with {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
     expected_output="Updated author profile files containing deep technical/visual analysis and a detailed 'author_style_profile' section with philosophy and intentions.",
     #agent=photo_analyser
@@ -41,7 +41,7 @@ style_report = Task(
                                         - per-author preferred harmony profile and notable deviations.
                     Also include a dedicated per-author section that summarizes each author's philosophy and intentions
                     (sourced from 'author_style_profile') and a cross-author comparison of these intentions.
-                    You MUST call tool read_profile_files_tool exactly once with {style_data_dir}.
+                    You MUST call tool read_profile_files exactly once with {style_data_dir}.
                     Do not output tool-call JSON in the final answer.''',
         expected_output="File 'comprehensive_style_report.json' containing common visual/technical patterns, aggregated HEX and Itten harmony statistics, plus per-author philosophy and intention summaries.",
     #agent=data_synthesizer,
